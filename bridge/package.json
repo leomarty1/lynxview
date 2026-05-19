@@ -1,0 +1,20 @@
+{
+  "name": "@lynxter-control/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bridge local Node.js — Express + SSE qui spawn `claude --print` pour exécuter les skills lynxter-support depuis l'UI web.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "yaml": "^2.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
