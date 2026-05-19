@@ -1,6 +1,12 @@
 # LYNXVIEW
 
-> Lynxter Control — web UI locale pour piloter le plugin Claude Code `lynxter-support`.
+> Web UI locale pour piloter le plugin Claude Code `lynxter-support`.
+>
+> **Production live** : https://leomarty1.github.io/lynxview/
+> **Repo** : leomarty1/lynxview (public — code uniquement, pas de KB ni de secret)
+> **Dossier local** : `C:\Users\leo.marty\Documents\Claude\lynxter-control\`
+> (le nom du dossier local est resté `lynxter-control` pour compatibilité
+> avec le raccourci shell:startup ; le projet et le repo s'appellent `lynxview`)
 
 Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le navigateur. Bridge Node qui parle à `claude` en headless, autostart silencieux Windows, streaming SSE des réponses.
 
@@ -20,7 +26,7 @@ Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le nav
 
 ```powershell
 # 1. Installer les deps
-cd C:\Users\leo.marty\Documents\Claude\lynxview
+cd C:\Users\leo.marty\Documents\Claude\lynxter-control
 npm install
 
 # 2. Installer l'autostart silencieux (raccourci dans shell:startup)
@@ -32,9 +38,9 @@ npm run bridge
 
 Une fois en place, le bridge tourne en console cachée à chaque ouverture de session Windows. L'UI est accessible :
 
-- **Prod hébergée (recommandé)** : https://leomarty1.github.io/lynxview/ — déployée auto via GitHub Actions à chaque push sur `main`.
+- **Prod hébergée (recommandé)** : https://leomarty1.github.io/lynxview/ — déploiement manuel depuis la branche `gh-pages` (voir section déploiement plus bas).
 - **Dev local** : `npm run web` → http://localhost:5173 (Vite hot-reload).
-- **Build local** : `LYNXTER_BASE="./" npm run web:build` puis ouvrir `web/dist/index.html` (file://).
+- **Build local** : `LYNXVIEW_BASE="./" npm run web:build` puis ouvrir `web/dist/index.html` (file://).
 
 Dans tous les cas, **l'UI parle au bridge local** sur `http://127.0.0.1:5174`. Le bridge ne tourne JAMAIS dans le cloud — il a besoin d'accès local à `claude` CLI et au plugin.
 
@@ -42,9 +48,12 @@ Dans tous les cas, **l'UI parle au bridge local** sur `http://127.0.0.1:5174`. L
 
 URL publique live : **https://leomarty1.github.io/lynxview/**
 
-### Méthode actuelle (manual depuis branche `gh-pages`)
+### Méthode actuelle — déploiement manuel depuis branche `gh-pages`
 
-Le workflow GitHub Actions (`.github/workflows/deploy-pages.yml`) a été préparé mais nécessite un PAT avec scope `workflow` pour être commit. En attendant, le déploiement se fait depuis une branche `gh-pages` qui contient directement le contenu de `web/dist`.
+Le déploiement se fait par push de la branche `gh-pages` qui contient
+directement le contenu buildé de `web/dist`. Le workflow GitHub Actions
+auto-deploy a été retiré (nécessite un PAT avec scope `workflow` ; pas
+indispensable pour le workflow actuel).
 
 Rebuild + redeploy :
 
@@ -61,18 +70,6 @@ cd ..
 git worktree remove tmp-gh-pages
 ```
 
-### Méthode auto (workflow Actions) — quand PAT a scope `workflow`
-
-```powershell
-# 1. Ajouter le workflow file au repo (push avec PAT classic + workflow scope)
-git add .github/workflows/deploy-pages.yml
-git commit -m "feat: re-add auto-deploy workflow"
-git push origin main
-
-# 2. Pages bascule automatiquement source=Actions
-gh api -X PUT repos/leomarty1/lynxview/pages -f "build_type=workflow"
-```
-
 ## Connecter HubSpot et GitHub (panneaux droite UI)
 
 Depuis la v0.2.0, le bridge appelle les API HubSpot et GitHub **directement**
@@ -84,13 +81,18 @@ Tokens stockés dans `%APPDATA%\lynxter-bridge\` (jamais commités) :
 ### HubSpot
 
 1. HubSpot → Settings → Integrations → **Private Apps** → Create a private app
-2. Onglet **Scopes** :
+2. Onglet **Scopes** (les 5 scopes du bridge) :
    - `crm.objects.tickets.read`
    - `crm.objects.contacts.read`
    - `crm.objects.companies.read`
    - `crm.objects.owners.read`
+   - `crm.schemas.contacts.read`
 3. Copie le token, dépose-le dans `%APPDATA%\lynxter-bridge\hubspot-token.txt`
 4. Relance le bridge
+
+> Si tu n'as pas les droits admin pour créer une Private App, demande à un
+> admin de la créer pour toi. En attendant, le panneau UI affiche les
+> instructions setup directement (pas d'erreur cryptique).
 
 ### GitHub board
 
@@ -114,10 +116,11 @@ directement à la place de la queue/board.
 | Bridge local | ✅ Fonctionne | `npm run install:autostart` une fois |
 | Skills file-based (`/diagnostic`, `/draft-client`, `/rapport-terrain`, `/prediag`, `/safety-check`, `/refine`, `/learn`, `/msg-post-maintenance`) | ✅ Fonctionnent en streaming complet | — |
 | `/support` (point d'entrée) | ✅ Fonctionne | — |
-| `/hubspot` (MCP claude.ai OAuth) | ⚠️ Limité | Les MCPs OAuth claude.ai ne sont pas accessibles en mode `claude --print` headless. Solution : installer le MCP HubSpot via `claude mcp add hubspot npx -y @hubspot/mcp-server` (config locale, pas OAuth). |
-| `/github-board` (gh CLI) | ⚠️ Limité | Le PAT actuel n'a pas accès à l'org LynxterAM. Re-`gh auth login -w -s repo,read:project,write:project,read:org` avec un compte ayant accès LynxterAM. |
-| `/onboarding-client` (gh CLI projects) | ⚠️ Limité | Idem `/github-board`. |
+| Panel HubSpot (REST direct depuis le bridge) | ⚠️ Token manquant | Crée une Private App HubSpot (cf. section ci-dessus). Tant que le token n'est pas là, le panneau affiche les instructions de setup. |
+| Panel GitHub Board (GraphQL direct depuis le bridge) | ✅ Live | Token GitHub déposé dans `%APPDATA%\lynxter-bridge\github-token.txt`. Cible par défaut LynxterAM #19. |
 | `/update-plugin`, `/bc-devis` | ✅/⚠️ | update-plugin OK. bc-devis = placeholder volontaire. |
+
+Important : depuis la v0.2.0, **HubSpot et GitHub ne passent plus par `claude --print`** mais directement par les APIs REST/GraphQL. Les skills `/hubspot` et `/github-board` du plugin restent utilisables en session Claude Code interactive (terminal classique).
 
 Au premier lancement de l'UI, elle te demande le **bridge token** (généré automatiquement au premier démarrage du bridge, stocké dans `%APPDATA%\lynxter-bridge\token.txt`). Tu colles le token une fois, c'est mémorisé en localStorage.
 
@@ -125,7 +128,7 @@ Au premier lancement de l'UI, elle te demande le **bridge token** (généré aut
 
 - Bridge bind sur `127.0.0.1` uniquement (jamais `0.0.0.0`)
 - Auth bearer token obligatoire sur tous les endpoints sauf `/status`
-- CORS strict : seul `http://localhost:5173`, `http://localhost:4173` et `https://leo-marty.github.io` sont autorisés
+- CORS strict : seul `http://localhost:5173`, `http://localhost:4173` et `https://leomarty1.github.io` sont autorisés
 - Le token est généré avec `crypto.randomBytes(32)` au premier lancement
 - Le token est dans `.gitignore` (jamais commité)
 - Pas d'API key Claude exposée — le bridge délègue à `claude` CLI qui utilise ta session locale

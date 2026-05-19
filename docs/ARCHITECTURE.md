@@ -1,49 +1,48 @@
 # Architecture — Lynxter Control
 
-## Vue d'ensemble
+## Vue d'ensemble (v0.2)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                          NAVIGATEUR (UI Vite/React)                       │
+│                  NAVIGATEUR — UI Vite/React (GitHub Pages)                │
+│                  https://leomarty1.github.io/lynxview/                    │
 │                                                                          │
 │   ┌─────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────┐  │
 │   │ SkillRunner │   │ StreamPanel  │   │ HubSpotQueue │   │ History  │  │
-│   │ + dropdown  │   │ (markdown +  │   │ GitHubBoard  │   │ (local-  │  │
-│   │ + textarea  │   │  tool calls) │   │ (cache 5min) │   │  Storage)│  │
+│   │ + auto-     │   │ (markdown +  │   │ GitHubBoard  │   │ (local-  │  │
+│   │   suggest   │   │  tool calls) │   │ (cache 5min) │   │  Storage)│  │
 │   └─────┬───────┘   └──────┬───────┘   └──────┬───────┘   └────┬─────┘  │
 │         │                  │                  │                │        │
-│         └──── fetch + SSE / GET cache ────────┴────────────────┘        │
-│                              │                                          │
-│         Bearer token (mémorisé en localStorage, jamais transmis ailleurs│
+│         └──── fetch + SSE / GET cache (Bearer token) ──────────┘        │
 └──────────────────────────────┼──────────────────────────────────────────┘
-                               │ HTTP 127.0.0.1:5174 (jamais LAN)
+                               │ HTTP 127.0.0.1:5174 (jamais LAN, jamais cloud)
                                ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                       BRIDGE Node Express (local)                         │
 │                                                                          │
 │   ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐ │
 │   │ /status │  │ /skills  │  │ /run     │  │ /hubspot │  │ /github    │ │
-│   │ noauth  │  │ (cache   │  │ SSE      │  │ cache    │  │ cache      │ │
-│   │         │  │  mtime)  │  │ stream   │  │ 5min     │  │ 5min       │ │
+│   │ noauth  │  │ (scan    │  │ SSE      │  │ REST     │  │ GraphQL    │ │
+│   │         │  │  mtime)  │  │ stream   │  │ direct   │  │ direct     │ │
 │   └─────────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬──────┘ │
 │                     │             │             │              │        │
-│                     │             ▼             ▼              ▼        │
-│                     │      ┌──────────────────────────────────────┐    │
-│                     │      │  spawn `claude --print               │    │
-│                     │      │    --output-format stream-json       │    │
-│                     │      │    --verbose`                         │    │
-│                     │      │  (prompt via stdin → no injection)   │    │
-│                     │      └────────────────┬─────────────────────┘    │
-│                     │                       │                          │
-│                     ▼                       ▼                          │
-│              ┌──────────────────────────────────────┐                  │
-│              │  lynxter-support-cc/                 │                  │
-│              │    skills/<name>/SKILL.md            │                  │
-│              │    references/*.md (KB)              │                  │
-│              │    .claude-plugin/plugin.json        │                  │
-│              └──────────────────────────────────────┘                  │
+│                     ▼             ▼             ▼              ▼        │
+│           ┌──────────────┐ ┌──────────────┐ ┌──────────┐ ┌──────────┐  │
+│           │ lynxter-     │ │ spawn        │ │ HubSpot  │ │ GitHub   │  │
+│           │ support-cc/  │ │ node cli.js  │ │ API REST │ │ GraphQL  │  │
+│           │ skills/*.md  │ │ --print      │ │ + Private│ │ + PAT    │  │
+│           │ references/  │ │ stream-json  │ │ App      │ │ classic  │  │
+│           └──────────────┘ └──────┬───────┘ └──────────┘ └──────────┘  │
+│                                   │                                     │
+│                            (claude CC + plugin                          │
+│                             lynxter-support installé)                   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Changement v0.2** : HubSpot et GitHub n'utilisent plus `claude --print` ni les
+MCPs OAuth claude.ai (inaccessibles en headless). Ils parlent directement aux
+APIs avec des tokens locaux stockés dans `%APPDATA%\lynxter-bridge\`. Le bridge
+est ainsi 100% fonctionnel sans dépendre de sessions claude.ai interactives.
 
 ## Choix d'architecture
 
