@@ -73,6 +73,39 @@ git push origin main
 gh api -X PUT repos/leomarty1/lynxview/pages -f "build_type=workflow"
 ```
 
+## Connecter HubSpot et GitHub (panneaux droite UI)
+
+Depuis la v0.2.0, le bridge appelle les API HubSpot et GitHub **directement**
+(REST/GraphQL) au lieu de passer par `claude --print` + MCPs OAuth. Ça contourne
+le pb des MCPs claude.ai inaccessibles en headless.
+
+Tokens stockés dans `%APPDATA%\lynxter-bridge\` (jamais commités) :
+
+### HubSpot
+
+1. HubSpot → Settings → Integrations → **Private Apps** → Create a private app
+2. Onglet **Scopes** :
+   - `crm.objects.tickets.read`
+   - `crm.objects.contacts.read`
+   - `crm.objects.companies.read`
+   - `crm.objects.owners.read`
+3. Copie le token, dépose-le dans `%APPDATA%\lynxter-bridge\hubspot-token.txt`
+4. Relance le bridge
+
+### GitHub board
+
+1. https://github.com/settings/tokens → **Generate new token (classic)**
+2. Scopes : `repo` + `read:project` + `read:org`
+3. Dépose dans `%APPDATA%\lynxter-bridge\github-token.txt`
+4. Si le board cible n'est pas `LynxterAM #19`, override via env :
+   - `LYNXVIEW_GITHUB_OWNER=<owner>`
+   - `LYNXVIEW_GITHUB_OWNER_TYPE=organization` (ou `user`)
+   - `LYNXVIEW_GITHUB_PROJECT=<number>`
+   - `LYNXVIEW_GITHUB_USER=<login pour filtrer les items>`
+
+Si tokens absents, les panneaux UI affichent les instructions complètes
+directement à la place de la queue/board.
+
 ## Limitations actuelles (état au 2026-05-19)
 
 | Composant | Statut | Action requise |

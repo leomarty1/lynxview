@@ -1,8 +1,13 @@
 // SkillRunner.jsx — sélection skill + textarea + bouton run.
 // Charte : alignement gauche, jaune pour bouton primaire (taille > 20pt OK),
 // bleu pour le tag "sensitive".
+//
+// Mode auto : si selectedSkill est vide ("— Auto —"), un moteur de matching
+// suggère en temps réel (debounce 250ms) le skill le plus probable selon
+// le texte tapé. Léo peut accepter d'un clic ou ignorer la suggestion.
 
 import { useEffect, useState } from "react";
+import { matchSkill } from "../lib/skillMatch.js";
 
 export default function SkillRunner({
   skills,
@@ -16,12 +21,30 @@ export default function SkillRunner({
 }) {
   const [hint, setHint] = useState("");
   const [sensitive, setSensitive] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
 
   useEffect(() => {
     const s = skills.find((s) => s.name === selectedSkill);
     setHint(s?.argumentHint || "");
     setSensitive(!!s?.sensitive);
   }, [selectedSkill, skills]);
+
+  // Auto-détection : debounce 250ms, uniquement quand "Auto" est sélectionné.
+  useEffect(() => {
+    if (selectedSkill) {
+      setSuggestion(null);
+      return undefined;
+    }
+    if (!prompt || prompt.trim().length < 5) {
+      setSuggestion(null);
+      return undefined;
+    }
+    const id = setTimeout(() => {
+      const match = matchSkill(prompt, skills);
+      setSuggestion(match);
+    }, 250);
+    return () => clearTimeout(id);
+  }, [prompt, selectedSkill, skills]);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -53,7 +76,7 @@ export default function SkillRunner({
             className="lx-input w-full"
             disabled={running}
           >
-            <option value="">— Prompt libre —</option>
+            <option value="">— Auto (claude détecte) —</option>
             {skills.map((s) => (
               <option key={s.name} value={s.name}>
                 /{s.name}
@@ -87,13 +110,37 @@ export default function SkillRunner({
         placeholder={
           selectedSkill
             ? `Args / contenu pour /${selectedSkill}…`
-            : "Prompt libre — tape /support, /diagnostic, etc. directement si tu préfères."
+            : "Tape ta question librement — claude choisira le skill pertinent (mail client, problème S300X, demande de CR, etc.)"
         }
         rows={9}
         className="lx-input lx-input--mono resize-y text-sm"
         spellCheck="false"
         disabled={running}
       />
+
+      {/* Mode auto : suggestion en temps réel sous la textarea */}
+      {!selectedSkill && suggestion && (
+        <button
+          type="button"
+          onClick={() => onSelectSkill(suggestion.name)}
+          disabled={running}
+          className="self-start rounded border border-dashed border-lx-border bg-lx-soft px-3 py-1.5 text-xs text-lx-muted transition-colors hover:border-lx-yellow hover:text-lx-text"
+          title="Cliquer pour verrouiller ce skill avant de lancer"
+        >
+          <span className="mr-1 text-lx-subtle">détecté :</span>
+          <span className="font-mono font-medium text-lx-blue">
+            /{suggestion.name}
+          </span>
+          <span className="ml-2 text-lx-subtle">
+            ({suggestion.confidence}% confiance — clic pour verrouiller)
+          </span>
+        </button>
+      )}
+      {!selectedSkill && !suggestion && prompt && prompt.trim().length >= 5 && (
+        <p className="text-xs text-lx-subtle">
+          Aucun skill ne ressort clairement. Claude tranchera au lancement.
+        </p>
+      )}
 
       <p className="text-xs text-lx-subtle">
         <kbd className="rounded border border-lx-border bg-lx-soft px-1.5 py-0.5 font-mono text-[0.7rem]">
