@@ -116,11 +116,22 @@ export function createApp() {
     });
 
     // Si le client coupe la connexion, on tue le subprocess pour ne pas le laisser orphelin.
-    req.on("close", () => {
+    // ⚠️ On écoute `res.on("close")` et PAS `req.on("close")` :
+    // req.close fire dès que le client a fini d'envoyer son body (POST avec
+    // payload), même si la réponse SSE est toujours en train de streamer. On
+    // tuerait alors le subprocess immédiatement après le spawn.
+    // res.close en revanche fire quand le navigateur ferme l'onglet ou abort
+    // côté client — c'est le signal correct.
+    let procClosedNormally = false;
+    res.on("close", () => {
       clearInterval(heartbeat);
+      if (procClosedNormally) return;
       try {
         proc.kill();
       } catch {}
+    });
+    proc.once("close", () => {
+      procClosedNormally = true;
     });
   });
 
