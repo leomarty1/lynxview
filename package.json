@@ -1,0 +1,24 @@
+{
+  "name": "lynxter-control",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UI web + bridge local pour piloter le plugin Claude Code lynxter-support depuis le navigateur. Local-only, autostart silencieux Windows, SSE streaming.",
+  "author": "Léo Marty <leo.marty@lynxter.fr>",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "bridge",
+    "web"
+  ],
+  "scripts": {
+    "bridge": "npm run start --workspace bridge",
+    "bridge:dev": "npm run dev --workspace bridge",
+    "web": "npm run dev --workspace web",
+    "web:build": "npm run build --workspace web",
+    "dev": "concurrently \"npm:bridge:dev\" \"npm:web\"",
+    "install:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-autostart.ps1",
+    "uninstall:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
