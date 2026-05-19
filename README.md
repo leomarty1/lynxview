@@ -32,7 +32,7 @@ npm run bridge
 
 Une fois en place, le bridge tourne en console cachée à chaque ouverture de session Windows. L'UI est accessible :
 
-- **Prod hébergée (recommandé)** : https://leo-marty.github.io/lynxview/ — déployée auto via GitHub Actions à chaque push sur `main`.
+- **Prod hébergée (recommandé)** : https://leomarty1.github.io/lynxview/ — déployée auto via GitHub Actions à chaque push sur `main`.
 - **Dev local** : `npm run web` → http://localhost:5173 (Vite hot-reload).
 - **Build local** : `LYNXTER_BASE="./" npm run web:build` puis ouvrir `web/dist/index.html` (file://).
 
@@ -46,16 +46,16 @@ Setup initial (une seule fois) :
 
 ```powershell
 # 1. Push initial sur GitHub perso
-gh repo create leo-marty/lynxview --public --source="." --remote=origin --push
+gh repo create leomarty1/lynxview --public --source="." --remote=origin --push
 
 # 2. Activer Pages source=Actions
-gh api -X POST repos/leo-marty/lynxview/pages -f "build_type=workflow"
+gh api -X POST repos/leomarty1/lynxview/pages -f "build_type=workflow"
 
 # 3. Trigger le premier deploy
 gh workflow run deploy-pages.yml
 ```
 
-URL publique : https://leo-marty.github.io/lynxview/
+URL publique : https://leomarty1.github.io/lynxview/
 
 Au premier lancement de l'UI, elle te demande le **bridge token** (généré automatiquement au premier démarrage du bridge, stocké dans `%APPDATA%\lynxter-bridge\token.txt`). Tu colles le token une fois, c'est mémorisé en localStorage.
 

@@ -55,7 +55,7 @@ export const config = {
     "http://localhost:4173",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:4173",
-    "https://leo-marty.github.io",
+    "https://leomarty1.github.io",
     // Si tu sers l'UI buildée depuis file://, le navigateur envoie Origin: null
     "null",
   ],
