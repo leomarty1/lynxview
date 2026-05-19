@@ -40,22 +40,51 @@ Dans tous les cas, **l'UI parle au bridge local** sur `http://127.0.0.1:5174`. L
 
 ## Déploiement GitHub Pages
 
-Le workflow `.github/workflows/deploy-pages.yml` build l'UI (Vite, base `/lynxview/`) et la déploie sur Pages à chaque push sur `main` touchant `web/`, `package.json` ou le workflow.
+URL publique live : **https://leomarty1.github.io/lynxview/**
 
-Setup initial (une seule fois) :
+### Méthode actuelle (manual depuis branche `gh-pages`)
+
+Le workflow GitHub Actions (`.github/workflows/deploy-pages.yml`) a été préparé mais nécessite un PAT avec scope `workflow` pour être commit. En attendant, le déploiement se fait depuis une branche `gh-pages` qui contient directement le contenu de `web/dist`.
+
+Rebuild + redeploy :
 
 ```powershell
-# 1. Push initial sur GitHub perso
-gh repo create leomarty1/lynxview --public --source="." --remote=origin --push
-
-# 2. Activer Pages source=Actions
-gh api -X POST repos/leomarty1/lynxview/pages -f "build_type=workflow"
-
-# 3. Trigger le premier deploy
-gh workflow run deploy-pages.yml
+cd C:\Users\leo.marty\Documents\Claude\lynxter-control
+npm run web:build
+git worktree add tmp-gh-pages gh-pages
+Copy-Item -Path "web\dist\*" -Destination "tmp-gh-pages\" -Recurse -Force
+cd tmp-gh-pages
+git add -A
+git commit -m "deploy: rebuild UI"
+git push origin gh-pages
+cd ..
+git worktree remove tmp-gh-pages
 ```
 
-URL publique : https://leomarty1.github.io/lynxview/
+### Méthode auto (workflow Actions) — quand PAT a scope `workflow`
+
+```powershell
+# 1. Ajouter le workflow file au repo (push avec PAT classic + workflow scope)
+git add .github/workflows/deploy-pages.yml
+git commit -m "feat: re-add auto-deploy workflow"
+git push origin main
+
+# 2. Pages bascule automatiquement source=Actions
+gh api -X PUT repos/leomarty1/lynxview/pages -f "build_type=workflow"
+```
+
+## Limitations actuelles (état au 2026-05-19)
+
+| Composant | Statut | Action requise |
+|---|---|---|
+| UI Pages | ✅ Live | — |
+| Bridge local | ✅ Fonctionne | `npm run install:autostart` une fois |
+| Skills file-based (`/diagnostic`, `/draft-client`, `/rapport-terrain`, `/prediag`, `/safety-check`, `/refine`, `/learn`, `/msg-post-maintenance`) | ✅ Fonctionnent en streaming complet | — |
+| `/support` (point d'entrée) | ✅ Fonctionne | — |
+| `/hubspot` (MCP claude.ai OAuth) | ⚠️ Limité | Les MCPs OAuth claude.ai ne sont pas accessibles en mode `claude --print` headless. Solution : installer le MCP HubSpot via `claude mcp add hubspot npx -y @hubspot/mcp-server` (config locale, pas OAuth). |
+| `/github-board` (gh CLI) | ⚠️ Limité | Le PAT actuel n'a pas accès à l'org LynxterAM. Re-`gh auth login -w -s repo,read:project,write:project,read:org` avec un compte ayant accès LynxterAM. |
+| `/onboarding-client` (gh CLI projects) | ⚠️ Limité | Idem `/github-board`. |
+| `/update-plugin`, `/bc-devis` | ✅/⚠️ | update-plugin OK. bc-devis = placeholder volontaire. |
 
 Au premier lancement de l'UI, elle te demande le **bridge token** (généré automatiquement au premier démarrage du bridge, stocké dans `%APPDATA%\lynxter-bridge\token.txt`). Tu colles le token une fois, c'est mémorisé en localStorage.
 
