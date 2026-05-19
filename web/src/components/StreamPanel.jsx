@@ -7,9 +7,16 @@ import remarkGfm from "remark-gfm";
 export default function StreamPanel({ events, running, error }) {
   const scrollRef = useRef(null);
 
+  // Auto-scroll seulement si l'utilisateur est déjà proche du bas. Si Léo
+  // a remonté le panel pour relire le début d'un /diagnostic, on ne le
+  // ramène pas en bas à chaque token. Seuil : 80px du bas.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (nearBottom) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [events]);
 

@@ -19,9 +19,17 @@ export function Logo({ size = 32, className = "" }) {
   );
 }
 
-export function Baseline({ className = "" }) {
+export function Baseline({ className = "", variant = "yellow" }) {
+  // variant "yellow" : taille ≥ 20pt obligatoire (charte p.11 — jaune interdit
+  //                    pour <20pt). Utilisée sur visuels majeurs (token setup).
+  // variant "compact" : version header gris foncé (Outfit ExtraBold conservé),
+  //                     contourne la limite charte tout en gardant le tag visuel.
+  const style =
+    variant === "compact"
+      ? "font-display font-extrabold uppercase tracking-machine text-lx-deep"
+      : "lx-baseline";
   return (
-    <span className={`lx-baseline ${className}`} aria-label="Lynxter — Make it smarter">
+    <span className={`${style} ${className}`} aria-label="Lynxter — Make it smarter">
       Make&nbsp;it&nbsp;smarter
     </span>
   );

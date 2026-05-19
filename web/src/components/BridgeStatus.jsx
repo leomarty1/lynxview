@@ -9,6 +9,11 @@ export default function BridgeStatus({ baseUrl }) {
   useEffect(() => {
     let cancelled = false;
     async function tick() {
+      // Skip si tab en arrière-plan : pas la peine de poller un bridge local
+      // alors que l'utilisateur regarde un autre onglet.
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
       try {
         const data = await pingStatus(baseUrl);
         if (!cancelled) {
@@ -20,9 +25,16 @@ export default function BridgeStatus({ baseUrl }) {
     }
     tick();
     const id = setInterval(tick, 10_000);
+    // Tick immédiat quand le tab revient au premier plan (rafraîchit la
+    // pastille sans attendre 10s).
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [baseUrl]);
 

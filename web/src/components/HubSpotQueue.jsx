@@ -82,11 +82,18 @@ export default function HubSpotQueue({ baseUrl, token, onUseTicket }) {
         <button
           type="button"
           onClick={() =>
-            onUseTicket?.({ skill: "hubspot", prompt: "" })
+            // Pointe vers /support (sait router selon le contenu collé).
+            // L'ancien target "hubspot" laissait le select dans un état invalide
+            // si le plugin /hubspot n'est pas listé tel quel après v0.2.
+            onUseTicket?.({
+              skill: "support",
+              prompt: "Traite ce ticket HubSpot : (colle ID ou contenu)",
+            })
           }
           className="text-lx-muted hover:text-lx-blue"
+          title="Pré-remplit /support — colle l'ID ou le contenu du ticket"
         >
-          Fetch ticket →
+          Traiter un ticket →
         </button>
       </div>
     </div>

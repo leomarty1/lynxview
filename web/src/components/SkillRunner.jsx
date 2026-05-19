@@ -116,6 +116,11 @@ export default function SkillRunner({
         className="lx-input lx-input--mono resize-y text-sm"
         spellCheck="false"
         disabled={running}
+        aria-label={
+          selectedSkill
+            ? `Arguments pour le skill /${selectedSkill}`
+            : "Prompt libre ou question — claude détectera le skill"
+        }
       />
 
       {/* Mode auto : suggestion en temps réel sous la textarea */}

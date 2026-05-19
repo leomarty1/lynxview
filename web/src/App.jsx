@@ -22,7 +22,8 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
-  const [historyEntries, setHistoryEntries] = useState(HistStore.list());
+  // Lazy init : on évite d'appeler HistStore.list() à chaque render.
+  const [historyEntries, setHistoryEntries] = useState(() => HistStore.list());
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -145,7 +146,10 @@ export default function App() {
             <ProductName name="LYNXVIEW" />
           </div>
           <span className="ml-3 hidden border-l border-lx-border pl-3 sm:inline">
-            <Baseline className="text-base" />
+            {/* Variant "compact" gris foncé : la baseline jaune charte est
+                réservée aux gros titres (text-2xl+). Ici text-xs subtle pour
+                rester discret dans le header. */}
+            <Baseline className="text-[0.7rem]" variant="compact" />
           </span>
         </div>
         <div className="flex items-center gap-5">
