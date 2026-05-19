@@ -1,5 +1,5 @@
 {
-  "name": "@lynxter-control/bridge",
+  "name": "@lynxview/bridge",
   "version": "0.1.0",
   "private": true,
   "description": "Bridge local Node.js — Express + SSE qui spawn `claude --print` pour exécuter les skills lynxter-support depuis l'UI web.",

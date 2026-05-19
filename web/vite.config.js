@@ -5,17 +5,18 @@ import react from "@vitejs/plugin-react";
 //
 // `base` est sensible au contexte :
 //   - dev (`npm run web`)           → `/`   (Vite dev server à la racine)
-//   - prod GitHub Pages (sous-path) → `/lynxter-control/` (par défaut)
-//   - prod servi en file:// local   → override via env LYNXTER_BASE="./"
+//   - prod GitHub Pages (sous-path) → `/lynxview/` (par défaut)
+//   - prod servi en file:// local   → override via env LYNXVIEW_BASE="./"
 //
 // La config GitHub Pages standard sert le repo sous `/<repo-name>/`.
-// Override possible : `LYNXTER_BASE=/ vite build` pour racine, ou
-// `LYNXTER_BASE=./ vite build` pour ouverture file://.
+// Override possible : `LYNXVIEW_BASE=/ vite build` pour racine, ou
+// `LYNXVIEW_BASE=./ vite build` pour ouverture file://.
 export default defineConfig(({ command }) => {
   const isProd = command === "build";
   const base =
+    process.env.LYNXVIEW_BASE ||
     process.env.LYNXTER_BASE ||
-    (isProd ? "/lynxter-control/" : "/");
+    (isProd ? "/lynxview/" : "/");
 
   return {
     plugins: [react()],

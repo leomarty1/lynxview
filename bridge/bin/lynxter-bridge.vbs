@@ -5,7 +5,7 @@
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
-' Le repo lynxter-control est à côté de ce fichier : ..\..\
+' Le repo lynxview est à côté de ce fichier : ..\..\
 scriptDir = fso.GetParentFolderName(WScript.ScriptFullName)
 bridgeDir = fso.GetParentFolderName(scriptDir)
 repoDir   = fso.GetParentFolderName(bridgeDir)

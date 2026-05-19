@@ -1,6 +1,6 @@
-// storage.js — wrappers localStorage avec namespace lynxter-control.
+// storage.js — wrappers localStorage avec namespace lynxview.
 
-const NS = "lynxter-control:";
+const NS = "lynxview:";
 
 export function load(key, fallback = null) {
   try {

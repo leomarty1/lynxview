@@ -1,4 +1,6 @@
-# Lynxter Control
+# LYNXVIEW
+
+> Lynxter Control — web UI locale pour piloter le plugin Claude Code `lynxter-support`.
 
 Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le navigateur. Bridge Node qui parle à `claude` en headless, autostart silencieux Windows, streaming SSE des réponses.
 
@@ -18,7 +20,7 @@ Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le nav
 
 ```powershell
 # 1. Installer les deps
-cd C:\Users\leo.marty\Documents\Claude\lynxter-control
+cd C:\Users\leo.marty\Documents\Claude\lynxview
 npm install
 
 # 2. Installer l'autostart silencieux (raccourci dans shell:startup)
@@ -30,7 +32,7 @@ npm run bridge
 
 Une fois en place, le bridge tourne en console cachée à chaque ouverture de session Windows. L'UI est accessible :
 
-- **Prod hébergée (recommandé)** : https://leo-marty.github.io/lynxter-control/ — déployée auto via GitHub Actions à chaque push sur `main`.
+- **Prod hébergée (recommandé)** : https://leo-marty.github.io/lynxview/ — déployée auto via GitHub Actions à chaque push sur `main`.
 - **Dev local** : `npm run web` → http://localhost:5173 (Vite hot-reload).
 - **Build local** : `LYNXTER_BASE="./" npm run web:build` puis ouvrir `web/dist/index.html` (file://).
 
@@ -38,22 +40,22 @@ Dans tous les cas, **l'UI parle au bridge local** sur `http://127.0.0.1:5174`. L
 
 ## Déploiement GitHub Pages
 
-Le workflow `.github/workflows/deploy-pages.yml` build l'UI (Vite, base `/lynxter-control/`) et la déploie sur Pages à chaque push sur `main` touchant `web/`, `package.json` ou le workflow.
+Le workflow `.github/workflows/deploy-pages.yml` build l'UI (Vite, base `/lynxview/`) et la déploie sur Pages à chaque push sur `main` touchant `web/`, `package.json` ou le workflow.
 
 Setup initial (une seule fois) :
 
 ```powershell
 # 1. Push initial sur GitHub perso
-gh repo create leo-marty/lynxter-control --public --source="." --remote=origin --push
+gh repo create leo-marty/lynxview --public --source="." --remote=origin --push
 
 # 2. Activer Pages source=Actions
-gh api -X POST repos/leo-marty/lynxter-control/pages -f "build_type=workflow"
+gh api -X POST repos/leo-marty/lynxview/pages -f "build_type=workflow"
 
 # 3. Trigger le premier deploy
 gh workflow run deploy-pages.yml
 ```
 
-URL publique : https://leo-marty.github.io/lynxter-control/
+URL publique : https://leo-marty.github.io/lynxview/
 
 Au premier lancement de l'UI, elle te demande le **bridge token** (généré automatiquement au premier démarrage du bridge, stocké dans `%APPDATA%\lynxter-bridge\token.txt`). Tu colles le token une fois, c'est mémorisé en localStorage.
 
@@ -84,7 +86,7 @@ npm run uninstall:autostart
 ## Structure du repo
 
 ```
-lynxter-control/
+lynxview/
 ├── bridge/              # Serveur Node Express local
 │   ├── src/
 │   ├── bin/             # .vbs pour console cachée

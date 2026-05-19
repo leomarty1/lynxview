@@ -9,7 +9,7 @@ import StreamPanel from "./components/StreamPanel.jsx";
 import History from "./components/History.jsx";
 import HubSpotQueue from "./components/HubSpotQueue.jsx";
 import GitHubBoard from "./components/GitHubBoard.jsx";
-import { Logo, Baseline, Wordmark } from "./components/Brand.jsx";
+import { Logo, Baseline, Wordmark, ProductName } from "./components/Brand.jsx";
 import { fetchSkills, runSkill } from "./lib/api.js";
 import { Token, BaseUrl, History as HistStore } from "./lib/storage.js";
 
@@ -140,11 +140,9 @@ export default function App() {
       <header className="flex items-center justify-between border-b border-lx-border bg-lx-bg px-6 py-3">
         <div className="flex items-center gap-3">
           <Logo size={32} />
-          <div className="flex items-center gap-2">
+          <div className="flex items-baseline gap-2">
             <Wordmark className="text-base" />
-            <span className="font-display text-xs uppercase tracking-machine text-lx-subtle">
-              · control
-            </span>
+            <ProductName name="LYNXVIEW" />
           </div>
           <span className="ml-3 hidden border-l border-lx-border pl-3 sm:inline">
             <Baseline className="text-base" />

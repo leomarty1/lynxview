@@ -2,7 +2,7 @@
 // Layout aligné à gauche (charte). Logo + baseline. Boutons en jaune Lynxter.
 
 import { useState } from "react";
-import { Logo, Baseline, Wordmark } from "./Brand.jsx";
+import { Logo, Baseline, Wordmark, ProductName } from "./Brand.jsx";
 
 export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
   const [token, setToken] = useState("");
@@ -25,19 +25,20 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
     <div className="flex h-full w-full items-stretch bg-lx-bg">
       {/* Colonne de gauche — branding (alignement à gauche, charte p.24) */}
       <aside className="hidden w-2/5 flex-col justify-between border-r border-lx-border bg-lx-soft p-10 md:flex">
-        <div className="flex items-center gap-3">
-          <Logo size={40} />
+        <div className="flex items-baseline gap-3">
+          <Logo size={40} className="self-center" />
           <Wordmark className="text-lg" />
+          <ProductName name="LYNXVIEW" className="text-base" />
         </div>
 
         <div className="space-y-6">
-          <h1 className="font-display text-4xl font-normal uppercase leading-tight tracking-tight text-lx-deep">
-            Lynxter
-            <br />
-            Control
+          <h1 className="font-display text-5xl font-normal leading-none tracking-tight text-lx-deep">
+            <span className="lx-machine block text-[3.5rem] leading-none">
+              LYNXVIEW
+            </span>
           </h1>
           <p className="max-w-sm text-sm text-lx-muted">
-            Pilote ton plugin <code className="text-lx-blue">lynxter-support</code> depuis le navigateur, en local, sur ta machine. Aucune donnée ne quitte ton poste.
+            Pilote ton plugin <code className="text-lx-blue">lynxter-support</code> depuis le navigateur. Le bridge tourne sur ton PC — aucune donnée client ne quitte ton poste.
           </p>
         </div>
 
