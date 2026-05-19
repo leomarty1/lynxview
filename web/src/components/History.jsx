@@ -1,4 +1,4 @@
-// History.jsx — sidebar avec les runs précédents (localStorage).
+// History.jsx — sidebar runs précédents, light theme Lynxter.
 
 import { useState } from "react";
 
@@ -6,11 +6,12 @@ export default function History({ entries, onSelect, onClear, onRemove }) {
   const [confirmClear, setConfirmClear] = useState(false);
 
   return (
-    <div className="flex h-full flex-col gap-2">
+    <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-lx-muted">
-          Historique ({entries.length})
-        </h2>
+        <h3 className="font-display text-xs font-medium uppercase tracking-wide text-lx-deep">
+          Historique
+          <span className="ml-1 text-lx-subtle">({entries.length})</span>
+        </h3>
         {entries.length > 0 && (
           <button
             type="button"
@@ -23,35 +24,37 @@ export default function History({ entries, onSelect, onClear, onRemove }) {
                 setTimeout(() => setConfirmClear(false), 3000);
               }
             }}
-            className="text-xs text-lx-muted hover:text-lx-err"
+            className="text-xs text-lx-muted transition-colors hover:text-lx-err"
           >
             {confirmClear ? "Confirmer ?" : "Vider"}
           </button>
         )}
       </div>
 
-      <div className="flex-1 space-y-1 overflow-y-auto">
+      <div className="flex-1 space-y-1 overflow-y-auto pr-1">
         {entries.length === 0 && (
-          <p className="text-xs text-lx-muted">Pas encore de runs.</p>
+          <p className="text-xs text-lx-subtle">Pas encore de runs.</p>
         )}
         {entries.map((entry) => (
           <button
             key={entry.id}
             type="button"
             onClick={() => onSelect(entry)}
-            className="group flex w-full flex-col gap-1 rounded border border-transparent bg-lx-bg p-2 text-left text-xs hover:border-lx-border"
+            className="group block w-full rounded border border-transparent bg-lx-bg p-2 text-left text-xs transition-all hover:border-lx-border hover:bg-lx-soft"
           >
             <div className="flex items-center justify-between gap-1">
-              <span className="font-mono text-lx-accent">
+              <span className="font-mono font-medium text-lx-blue">
                 {entry.skill ? `/${entry.skill}` : "prompt libre"}
               </span>
-              <span className="text-lx-muted">{formatTime(entry.startedAt)}</span>
+              <span className="text-lx-subtle">
+                {formatTime(entry.startedAt)}
+              </span>
             </div>
             <p className="line-clamp-2 text-lx-muted">
-              {(entry.prompt || "").slice(0, 100)}
+              {(entry.prompt || "").slice(0, 100) || "—"}
             </p>
             <span
-              className="hidden self-end text-lx-err group-hover:inline"
+              className="hidden text-right text-lx-err group-hover:inline-block"
               role="button"
               tabIndex={0}
               onClick={(e) => {

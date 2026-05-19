@@ -1,4 +1,5 @@
-// App.jsx — orchestration : skills, token, history, run, panneaux droits.
+// App.jsx — orchestration. Layout charte Lynxter : header avec logo +
+// wordmark + baseline, 3 colonnes (history / runner+stream / HubSpot+GitHub).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import BridgeStatus from "./components/BridgeStatus.jsx";
@@ -8,6 +9,7 @@ import StreamPanel from "./components/StreamPanel.jsx";
 import History from "./components/History.jsx";
 import HubSpotQueue from "./components/HubSpotQueue.jsx";
 import GitHubBoard from "./components/GitHubBoard.jsx";
+import { Logo, Baseline, Wordmark } from "./components/Brand.jsx";
 import { fetchSkills, runSkill } from "./lib/api.js";
 import { Token, BaseUrl, History as HistStore } from "./lib/storage.js";
 
@@ -23,7 +25,6 @@ export default function App() {
   const [historyEntries, setHistoryEntries] = useState(HistStore.list());
   const abortRef = useRef(null);
 
-  // Charge la liste des skills quand on a un token valide.
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -78,7 +79,6 @@ export default function App() {
         },
         controller.signal,
       );
-      // Sauve dans l'historique sur fin propre.
       const entry = {
         startedAt: Date.now(),
         skill: selectedSkill,
@@ -135,27 +135,38 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-lx-border bg-lx-panel px-4 py-2">
+    <div className="flex h-full flex-col bg-lx-bg">
+      {/* Header — charte : logo sur fond blanc, baseline en jaune Lynxter à droite */}
+      <header className="flex items-center justify-between border-b border-lx-border bg-lx-bg px-6 py-3">
         <div className="flex items-center gap-3">
-          <h1 className="text-sm font-semibold">Lynxter Control</h1>
-          <span className="text-xs text-lx-muted">v0.1.0</span>
+          <Logo size={32} />
+          <div className="flex items-center gap-2">
+            <Wordmark className="text-base" />
+            <span className="font-display text-xs uppercase tracking-machine text-lx-subtle">
+              · control
+            </span>
+          </div>
+          <span className="ml-3 hidden border-l border-lx-border pl-3 sm:inline">
+            <Baseline className="text-base" />
+          </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <BridgeStatus baseUrl={baseUrl} />
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs text-lx-muted hover:text-lx-err"
-            title="Effacer token + repartir au setup"
+            className="text-xs text-lx-muted transition-colors hover:text-lx-err"
+            title="Effacer token et repartir au setup"
           >
             Reset
           </button>
         </div>
       </header>
 
-      <main className="grid h-full min-h-0 flex-1 grid-cols-[220px_1fr_300px] gap-3 p-3">
-        <aside className="flex h-full min-h-0 flex-col rounded-lg border border-lx-border bg-lx-panel p-3">
+      {/* Main — 3 colonnes alignées à gauche (charte p.24). */}
+      <main className="grid h-full min-h-0 flex-1 grid-cols-[240px_1fr_320px] gap-4 bg-lx-soft p-4">
+        {/* History */}
+        <aside className="lx-card flex h-full min-h-0 flex-col p-3">
           <History
             entries={historyEntries}
             onSelect={handleHistorySelect}
@@ -164,7 +175,8 @@ export default function App() {
           />
         </aside>
 
-        <section className="flex h-full min-h-0 flex-col gap-3">
+        {/* Runner + stream */}
+        <section className="flex h-full min-h-0 flex-col gap-4">
           <SkillRunner
             skills={skills}
             selectedSkill={selectedSkill}
@@ -180,15 +192,16 @@ export default function App() {
           </div>
         </section>
 
-        <aside className="flex h-full min-h-0 flex-col gap-3">
-          <div className="h-1/2 rounded-lg border border-lx-border bg-lx-panel p-3">
+        {/* Right rail */}
+        <aside className="flex h-full min-h-0 flex-col gap-4">
+          <div className="lx-card h-1/2 p-3">
             <HubSpotQueue
               baseUrl={baseUrl}
               token={token}
               onUseTicket={handleSourceClick}
             />
           </div>
-          <div className="h-1/2 rounded-lg border border-lx-border bg-lx-panel p-3">
+          <div className="lx-card h-1/2 p-3">
             <GitHubBoard
               baseUrl={baseUrl}
               token={token}

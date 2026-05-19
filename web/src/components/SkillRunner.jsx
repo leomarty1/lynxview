@@ -1,6 +1,8 @@
-// SkillRunner.jsx — sélection skill + textarea prompt + bouton run.
+// SkillRunner.jsx — sélection skill + textarea + bouton run.
+// Charte : alignement gauche, jaune pour bouton primaire (taille > 20pt OK),
+// bleu pour le tag "sensitive".
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function SkillRunner({
   skills,
@@ -13,10 +15,12 @@ export default function SkillRunner({
   running,
 }) {
   const [hint, setHint] = useState("");
+  const [sensitive, setSensitive] = useState(false);
 
   useEffect(() => {
     const s = skills.find((s) => s.name === selectedSkill);
     setHint(s?.argumentHint || "");
+    setSensitive(!!s?.sensitive);
   }, [selectedSkill, skills]);
 
   function handleSubmit(e) {
@@ -28,65 +32,78 @@ export default function SkillRunner({
     onRun?.();
   }
 
+  function handleKeyDown(e) {
+    // Ctrl+Enter pour lancer.
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !running) {
+      e.preventDefault();
+      onRun?.();
+    }
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-lg border border-lx-border bg-lx-panel p-4"
-    >
-      <div className="flex items-center gap-3">
-        <label className="flex-1">
-          <span className="text-xs uppercase tracking-wide text-lx-muted">
+    <form onSubmit={handleSubmit} className="lx-card flex flex-col gap-3 p-4">
+      <div className="flex items-end gap-3">
+        <label className="flex-1 space-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-lx-muted">
             Skill
           </span>
           <select
             value={selectedSkill}
             onChange={(e) => onSelectSkill(e.target.value)}
-            className="mt-1 w-full rounded border border-lx-border bg-lx-bg px-3 py-2 text-sm focus:border-lx-accent focus:outline-none"
+            className="lx-input w-full"
             disabled={running}
           >
             <option value="">— Prompt libre —</option>
             {skills.map((s) => (
               <option key={s.name} value={s.name}>
                 /{s.name}
-                {s.sensitive ? " 🔒" : ""}
+                {s.sensitive ? "  •  client/sensible" : ""}
               </option>
             ))}
           </select>
         </label>
+
         <button
           type="submit"
-          className={`min-w-[120px] rounded px-4 py-2 font-medium transition ${
-            running
-              ? "bg-lx-err text-white hover:brightness-110"
-              : "bg-lx-accent text-lx-bg hover:brightness-110"
-          }`}
+          className={running ? "lx-btn-danger min-w-[120px]" : "lx-btn-primary min-w-[120px]"}
         >
           {running ? "Arrêter" : "Lancer"}
         </button>
       </div>
 
-      {hint && (
-        <p className="text-xs text-lx-muted">
-          <span className="font-mono">argument-hint:</span> {hint}
-        </p>
-      )}
+      <div className="flex items-center gap-2 text-xs text-lx-muted">
+        {sensitive && <span className="lx-tag">sensible · local-only</span>}
+        {hint && (
+          <span>
+            <span className="font-mono text-lx-text">arg:</span> {hint}
+          </span>
+        )}
+      </div>
 
       <textarea
         value={prompt}
         onChange={(e) => onPromptChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder={
           selectedSkill
             ? `Args / contenu pour /${selectedSkill}…`
             : "Prompt libre — tape /support, /diagnostic, etc. directement si tu préfères."
         }
-        rows={8}
-        className="resize-y rounded border border-lx-border bg-lx-bg px-3 py-2 font-mono text-sm focus:border-lx-accent focus:outline-none"
+        rows={9}
+        className="lx-input lx-input--mono resize-y text-sm"
         spellCheck="false"
         disabled={running}
       />
 
-      <p className="text-xs text-lx-muted">
-        Astuce : Ctrl+Enter pour lancer (à venir).
+      <p className="text-xs text-lx-subtle">
+        <kbd className="rounded border border-lx-border bg-lx-soft px-1.5 py-0.5 font-mono text-[0.7rem]">
+          Ctrl
+        </kbd>
+        <span className="mx-1">+</span>
+        <kbd className="rounded border border-lx-border bg-lx-soft px-1.5 py-0.5 font-mono text-[0.7rem]">
+          Entrée
+        </kbd>
+        <span className="ml-2">pour lancer</span>
       </p>
     </form>
   );

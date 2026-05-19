@@ -1,10 +1,9 @@
-// BridgeStatus.jsx — pastille online/offline + uptime.
-// Ping /status toutes les 10s.
+// BridgeStatus.jsx — pastille online/offline charte Lynxter.
 
 import { useEffect, useState } from "react";
 import { pingStatus } from "../lib/api.js";
 
-export default function BridgeStatus({ baseUrl, onAuthError }) {
+export default function BridgeStatus({ baseUrl }) {
   const [status, setStatus] = useState({ ok: false, lastPingAt: 0 });
 
   useEffect(() => {
@@ -15,7 +14,7 @@ export default function BridgeStatus({ baseUrl, onAuthError }) {
         if (!cancelled) {
           setStatus({ ok: true, ...data, lastPingAt: Date.now() });
         }
-      } catch (err) {
+      } catch (_err) {
         if (!cancelled) setStatus({ ok: false, lastPingAt: Date.now() });
       }
     }
@@ -27,15 +26,18 @@ export default function BridgeStatus({ baseUrl, onAuthError }) {
     };
   }, [baseUrl]);
 
-  const colorClass = status.ok ? "bg-lx-ok" : "bg-lx-err";
+  const dotClass = status.ok ? "lx-dot lx-dot--ok" : "lx-dot lx-dot--err";
   const label = status.ok
-    ? `Bridge online — uptime ${formatUptime(status.uptimeSec || 0)}`
-    : "Bridge offline — lance `npm run bridge` ou attends l'autostart";
+    ? `Bridge online · uptime ${formatUptime(status.uptimeSec || 0)}`
+    : "Bridge offline";
 
   return (
-    <div className="flex items-center gap-2 text-xs text-lx-muted">
-      <span className={`inline-block h-2 w-2 rounded-full ${colorClass}`} />
-      <span title={status.pluginPath || ""}>{label}</span>
+    <div
+      className="flex items-center gap-2 text-xs text-lx-muted"
+      title={status.pluginPath || ""}
+    >
+      <span className={dotClass} aria-hidden />
+      <span>{label}</span>
     </div>
   );
 }
@@ -43,6 +45,7 @@ export default function BridgeStatus({ baseUrl, onAuthError }) {
 function formatUptime(sec) {
   if (sec < 60) return `${sec}s`;
   if (sec < 3600) return `${Math.floor(sec / 60)}m`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h${Math.floor((sec % 3600) / 60)}m`;
+  if (sec < 86400)
+    return `${Math.floor(sec / 3600)}h${String(Math.floor((sec % 3600) / 60)).padStart(2, "0")}`;
   return `${Math.floor(sec / 86400)}j`;
 }

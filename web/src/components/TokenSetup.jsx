@@ -1,7 +1,8 @@
-// TokenSetup.jsx — affiché au premier lancement (ou après reset) pour saisir
-// le bearer token du bridge. Le token est ensuite mémorisé en localStorage.
+// TokenSetup.jsx — premier lancement / après reset.
+// Layout aligné à gauche (charte). Logo + baseline. Boutons en jaune Lynxter.
 
 import { useState } from "react";
+import { Logo, Baseline, Wordmark } from "./Brand.jsx";
 
 export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
   const [token, setToken] = useState("");
@@ -21,62 +22,92 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
   }
 
   return (
-    <div className="flex h-full items-center justify-center p-6">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md space-y-4 rounded-lg border border-lx-border bg-lx-panel p-6 shadow-lg"
-      >
-        <div>
-          <h1 className="text-xl font-semibold">Lynxter Control — Setup</h1>
-          <p className="mt-1 text-sm text-lx-muted">
-            Colle le token du bridge. Il est dans{" "}
-            <code className="rounded bg-lx-bg px-1 py-0.5 text-xs">
-              %APPDATA%\lynxter-bridge\token.txt
-            </code>
-            .
+    <div className="flex h-full w-full items-stretch bg-lx-bg">
+      {/* Colonne de gauche — branding (alignement à gauche, charte p.24) */}
+      <aside className="hidden w-2/5 flex-col justify-between border-r border-lx-border bg-lx-soft p-10 md:flex">
+        <div className="flex items-center gap-3">
+          <Logo size={40} />
+          <Wordmark className="text-lg" />
+        </div>
+
+        <div className="space-y-6">
+          <h1 className="font-display text-4xl font-normal uppercase leading-tight tracking-tight text-lx-deep">
+            Lynxter
+            <br />
+            Control
+          </h1>
+          <p className="max-w-sm text-sm text-lx-muted">
+            Pilote ton plugin <code className="text-lx-blue">lynxter-support</code> depuis le navigateur, en local, sur ta machine. Aucune donnée ne quitte ton poste.
           </p>
         </div>
 
-        <label className="block">
-          <span className="text-sm text-lx-muted">URL du bridge</span>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="mt-1 w-full rounded border border-lx-border bg-lx-bg px-3 py-2 font-mono text-sm focus:border-lx-accent focus:outline-none"
-            spellCheck="false"
-          />
-        </label>
+        <Baseline className="text-2xl" />
+      </aside>
 
-        <label className="block">
-          <span className="text-sm text-lx-muted">Bridge token</span>
-          <input
-            type="password"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="hex 64 caractères"
-            className="mt-1 w-full rounded border border-lx-border bg-lx-bg px-3 py-2 font-mono text-sm focus:border-lx-accent focus:outline-none"
-            autoFocus
-            spellCheck="false"
-          />
-        </label>
-
-        {error && (
-          <p className="text-sm text-lx-err">{error}</p>
-        )}
-
-        <button
-          type="submit"
-          className="w-full rounded bg-lx-accent px-4 py-2 font-medium text-lx-bg transition hover:brightness-110"
+      {/* Colonne de droite — formulaire de connexion */}
+      <main className="flex flex-1 items-center justify-center p-8">
+        <form
+          onSubmit={handleSubmit}
+          className="lx-card w-full max-w-md space-y-5 p-7"
         >
-          Connecter
-        </button>
+          <header className="space-y-1">
+            <h2 className="font-display text-xl font-normal uppercase tracking-tight text-lx-deep">
+              Connexion au bridge
+            </h2>
+            <p className="text-sm text-lx-muted">
+              Récupère le token dans
+              <code className="ml-1 rounded bg-lx-soft px-1.5 py-0.5 text-xs text-lx-blue">
+                %APPDATA%\lynxter-bridge\token.txt
+              </code>
+            </p>
+          </header>
 
-        <p className="text-xs text-lx-muted">
-          Le token reste sur cet ordinateur — stocké en localStorage de ce
-          navigateur uniquement.
-        </p>
-      </form>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-lx-muted">
+              URL du bridge
+            </span>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="lx-input lx-input--mono w-full"
+              spellCheck="false"
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-lx-muted">
+              Bridge token
+            </span>
+            <input
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="hex 64 caractères"
+              className="lx-input lx-input--mono w-full"
+              autoFocus
+              spellCheck="false"
+            />
+          </label>
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded border border-lx-err/30 bg-lx-err-soft px-3 py-2 text-sm text-lx-err"
+            >
+              {error}
+            </p>
+          )}
+
+          <button type="submit" className="lx-btn-primary w-full">
+            Connecter
+          </button>
+
+          <p className="text-xs text-lx-subtle">
+            Le token reste sur cet ordinateur (localStorage de ce navigateur uniquement).
+          </p>
+        </form>
+      </main>
     </div>
   );
 }
