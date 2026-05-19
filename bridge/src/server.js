@@ -44,6 +44,32 @@ export function createApp() {
     });
   });
 
+  // /auth/local — auto-récupération du bearer token par l'UI.
+  //
+  // Pas de auth bearer requis (sinon circulaire), MAIS protégé par CORS :
+  // le middleware cors() ci-dessus exige une Origin whitelistée
+  // (localhost:5173/4173 + leomarty1.github.io). Une requête depuis un
+  // domaine inconnu ne passe pas le preflight et ne reçoit jamais le token.
+  //
+  // Modèle de menace : le bridge est bind sur 127.0.0.1 uniquement, donc seul
+  // un programme tournant sur la machine de Léo peut atteindre cet endpoint.
+  // Un browser tiers ne peut pas appeler /auth/local sans une Origin valide.
+  // Un programme non-browser local pourrait ignorer CORS et récupérer le
+  // token, mais à ce stade l'attaquant a déjà accès à la session Windows
+  // de Léo et a accès au fichier token.txt directement de toute façon.
+  app.get("/auth/local", (req, res) => {
+    const origin = req.headers.origin;
+    if (!origin || !config.allowedOrigins.includes(origin)) {
+      // Sans Origin valide on refuse silencieusement (pas de leak info).
+      return res.status(403).json({ error: "origin_not_allowed" });
+    }
+    res.json({
+      token: config.token,
+      version: "0.1.0",
+      issuedAt: Date.now(),
+    });
+  });
+
   // Toutes les autres routes : auth obligatoire.
   app.use(requireAuth);
 

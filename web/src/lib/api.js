@@ -17,6 +17,24 @@ export async function pingStatus(baseUrl) {
   return res.json();
 }
 
+/**
+ * Récupère automatiquement le bearer token du bridge local.
+ * Le bridge n'expose cet endpoint que si l'Origin est whitelistée côté CORS.
+ * Permet à l'UI d'éviter de demander à Léo de copier-coller le token.
+ */
+export async function fetchLocalToken(baseUrl) {
+  const res = await fetch(`${baseUrl}/auth/local`, { method: "GET" });
+  if (!res.ok) {
+    if (res.status === 403) throw new Error("origin_not_allowed");
+    throw new Error(`auth_local_failed_${res.status}`);
+  }
+  const data = await res.json();
+  if (!data.token || typeof data.token !== "string") {
+    throw new Error("auth_local_no_token");
+  }
+  return data.token;
+}
+
 export async function fetchSkills(baseUrl, token, { refresh = false } = {}) {
   const url = `${baseUrl}/skills${refresh ? "?refresh=true" : ""}`;
   const res = await fetch(url, { headers: buildHeaders(token) });
