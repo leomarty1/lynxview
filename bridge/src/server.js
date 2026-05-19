@@ -98,20 +98,42 @@ export function createApp() {
 
     writeEvent("start", { prompt: fullPrompt, startedAt: Date.now() });
 
+    // Garde anti double-callback : onClose et onError peuvent tous les deux
+    // tirer sur certaines erreurs (spawn ENOENT). Sans cette garde, res.end()
+    // serait appelé 2× → "write after end" et crash bridge.
+    let finalized = false;
+    const finalize = (eventName, payload) => {
+      if (finalized) return;
+      finalized = true;
+      clearInterval(heartbeat);
+      clearTimeout(runTimeout);
+      writeEvent(eventName, payload);
+      try {
+        res.end();
+      } catch {}
+    };
+
+    // Hard timeout côté bridge : un skill bloqué (claude CLI freezé) ne doit
+    // pas consommer un subprocess + interval indéfiniment.
+    const MAX_RUN_MS = 5 * 60 * 1000; // 5 min, large pour /diagnostic + KB
+    const runTimeout = setTimeout(() => {
+      try {
+        proc.kill();
+      } catch {}
+      finalize("error", { message: `run timeout after ${MAX_RUN_MS}ms` });
+    }, MAX_RUN_MS);
+
     const proc = spawnClaude({
       prompt: fullPrompt,
       onEvent: (event) => {
+        if (finalized) return;
         writeEvent(event.type || "message", event);
       },
       onClose: (code) => {
-        clearInterval(heartbeat);
-        writeEvent("end", { exitCode: code, endedAt: Date.now() });
-        res.end();
+        finalize("end", { exitCode: code, endedAt: Date.now() });
       },
       onError: (err) => {
-        clearInterval(heartbeat);
-        writeEvent("error", { message: err.message });
-        res.end();
+        finalize("error", { message: err.message });
       },
     });
 
@@ -122,16 +144,13 @@ export function createApp() {
     // tuerait alors le subprocess immédiatement après le spawn.
     // res.close en revanche fire quand le navigateur ferme l'onglet ou abort
     // côté client — c'est le signal correct.
-    let procClosedNormally = false;
     res.on("close", () => {
+      if (finalized) return;
       clearInterval(heartbeat);
-      if (procClosedNormally) return;
+      clearTimeout(runTimeout);
       try {
         proc.kill();
       } catch {}
-    });
-    proc.once("close", () => {
-      procClosedNormally = true;
     });
   });
 

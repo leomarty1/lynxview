@@ -10,7 +10,10 @@ import { getGitHubToken, githubBoardConfig } from "./tokens.js";
 
 let cache = { text: null, fetchedAt: 0, error: null };
 
+const GITHUB_FETCH_TIMEOUT_MS = 15_000;
+
 async function githubGraphQL(query, variables, token) {
+  // Garde anti-hang : si GitHub GraphQL n'envoie pas de réponse, on coupe.
   const res = await fetch("https://api.github.com/graphql", {
     method: "POST",
     headers: {
@@ -20,10 +23,11 @@ async function githubGraphQL(query, variables, token) {
       "X-GitHub-Api-Version": "2022-11-28",
     },
     body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`GitHub ${res.status}: ${body.slice(0, 200)}`);
+    throw new Error(`GitHub HTTP ${res.status}: ${body.slice(0, 120)}`);
   }
   const json = await res.json();
   if (json.errors && json.errors.length > 0) {

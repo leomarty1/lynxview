@@ -140,56 +140,6 @@ export function spawnClaude({ prompt, cwd, onEvent, onClose, onError }) {
   return proc;
 }
 
-/**
- * Variante "collect" : attend la fin et retourne tous les events + le texte final assistant.
- * Utilisée pour les endpoints qui n'ont pas besoin de streaming (HubSpot, GitHub).
- */
-export function runClaudeOnce({ prompt, cwd, timeoutMs = 120_000 }) {
-  return new Promise((resolve, reject) => {
-    const events = [];
-    const assistantText = [];
-    let finished = false;
-
-    const proc = spawnClaude({
-      prompt,
-      cwd,
-      onEvent: (event) => {
-        events.push(event);
-        if (event.type === "assistant" && event.message?.content) {
-          for (const item of event.message.content) {
-            if (item.type === "text" && typeof item.text === "string") {
-              assistantText.push(item.text);
-            }
-          }
-        }
-      },
-      onClose: (code, stderr) => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        if (code !== 0) {
-          reject(
-            new Error(`claude exited with code ${code}: ${stderr.slice(0, 500)}`),
-          );
-        } else {
-          resolve({ events, text: assistantText.join("\n").trim() });
-        }
-      },
-      onError: (err) => {
-        if (finished) return;
-        finished = true;
-        clearTimeout(timer);
-        reject(err);
-      },
-    });
-
-    const timer = setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      try {
-        proc.kill("SIGKILL");
-      } catch {}
-      reject(new Error(`claude timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
-}
+// (runClaudeOnce a été retiré : hubspot.js et github.js parlent directement
+// aux APIs REST/GraphQL depuis v0.2.0, plus besoin d'invoquer claude --print
+// pour ces sources de données.)

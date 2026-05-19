@@ -23,13 +23,20 @@ const TICKET_PROPERTIES = [
   "hs_lastmodifieddate",
 ].join(",");
 
+const HUBSPOT_FETCH_TIMEOUT_MS = 15_000;
+
 async function hubspotGet(path, token) {
+  // Garde anti-hang : si HubSpot ne ferme jamais la connexion, on coupe
+  // pour ne pas laisser le cache + l'UI bloqués indéfiniment.
   const res = await fetch(`${HUBSPOT_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(HUBSPOT_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`HubSpot ${res.status}: ${body.slice(0, 200)}`);
+    // Sanitize : tronqué + ne renvoie pas le path complet pour éviter
+    // d'éventuels leaks dans les messages d'erreur.
+    throw new Error(`HubSpot HTTP ${res.status}: ${body.slice(0, 120)}`);
   }
   return res.json();
 }
