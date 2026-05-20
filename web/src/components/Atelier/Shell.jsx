@@ -21,7 +21,13 @@ export default function AtelierShell({ baseUrl, token, onReset }) {
   const [dark, setDark] = useState(false);
 
   return (
-    <div className={`atelier ${dark ? "atelier--dark" : ""}`}>
+    <div
+      className={`atelier ${dark ? "atelier--dark" : ""}`}
+      // Force le shell à couvrir toute la viewport — sans ça la div n'a pas
+      // de hauteur (le `flex: 1` du CSS attend un parent flex container) et
+      // un bandeau blanc apparaît en bas en mode sombre.
+      style={{ minHeight: "100vh", display: "flex" }}
+    >
       <AtelierSidebar
         route={route}
         setRoute={setRoute}

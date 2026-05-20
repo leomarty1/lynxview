@@ -25,11 +25,20 @@ body {
   font-family: 'Roboto', system-ui, -apple-system, "Segoe UI", sans-serif;
   font-weight: 300;
   color: var(--lx-anthracite);
-  background: #f5f4f1;
+  /* Anthracite par défaut : si jamais l'app n'a pas pleine hauteur (overscroll
+     iOS, fenêtre redimensionnée, ou bug de layout) le body ne flashe pas en
+     blanc en mode sombre. Le shell .atelier override sur son périmètre. */
+  background: #2a2624;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/* Override body en light quand on n'est pas en mode sombre. Le contexte est
+   donné par la classe .atelier (light) ou .atelier.atelier--dark (dark) qui
+   se trouve dans le DOM. Approche simple : on regarde si la racine contient
+   un descendant .atelier--dark. */
+body:has(.atelier:not(.atelier--dark)) { background: #f5f4f1; }
 
 /* Scrollbars discrètes */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
