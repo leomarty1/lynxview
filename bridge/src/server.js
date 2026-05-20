@@ -15,6 +15,12 @@ import {
   getOAuthStatus as getHubSpotOAuthStatus,
   logout as hubspotLogout,
 } from "./hubspot-oauth.js";
+import {
+  listKnowledge,
+  getKnowledgeFile,
+  openKnowledgeFile,
+  clearKnowledgeCache,
+} from "./knowledge.js";
 
 export function createApp() {
   const app = express();
@@ -266,6 +272,44 @@ export function createApp() {
   app.post("/hubspot/oauth/logout", (req, res) => {
     hubspotLogout();
     clearHubSpotCache();
+    res.json({ ok: true });
+  });
+
+  // ============================================================
+  // /knowledge — base de connaissance (Connaissance/ + references/)
+  // ============================================================
+
+  // GET /knowledge?refresh=true — liste sources + categories + items.
+  app.get("/knowledge", (req, res) => {
+    const refresh = req.query.refresh === "true";
+    res.json(listKnowledge({ refresh }));
+  });
+
+  // GET /knowledge/file?id=... — contenu d'un fichier markdown.
+  // Pour les fichiers binaires (PDF/docx/etc.) renvoie 415 + hint.
+  app.get("/knowledge/file", (req, res) => {
+    const id = String(req.query.id || "");
+    if (!id) return res.status(400).json({ error: "id_required" });
+    const result = getKnowledgeFile(id);
+    if (result.error) {
+      return res.status(result.status || 500).json(result);
+    }
+    res.json(result);
+  });
+
+  // POST /knowledge/open { id } — lance le fichier dans le programme par défaut.
+  app.post("/knowledge/open", (req, res) => {
+    const id = String(req.body?.id || "");
+    if (!id) return res.status(400).json({ error: "id_required" });
+    const result = openKnowledgeFile(id);
+    if (result.error) {
+      return res.status(result.status || 500).json(result);
+    }
+    res.json(result);
+  });
+
+  app.post("/knowledge/invalidate", (req, res) => {
+    clearKnowledgeCache();
     res.json({ ok: true });
   });
 

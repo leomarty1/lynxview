@@ -60,6 +60,36 @@ export async function fetchGitHub(baseUrl, token, { refresh = false } = {}) {
   return res.json();
 }
 
+export async function fetchKnowledge(baseUrl, token, { refresh = false } = {}) {
+  const url = `${baseUrl}/knowledge${refresh ? "?refresh=true" : ""}`;
+  const res = await fetch(url, { headers: buildHeaders(token) });
+  if (!res.ok) throw new Error(`knowledge_failed_${res.status}`);
+  return res.json();
+}
+
+export async function fetchKnowledgeFile(baseUrl, token, id) {
+  const url = `${baseUrl}/knowledge/file?id=${encodeURIComponent(id)}`;
+  const res = await fetch(url, { headers: buildHeaders(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `knowledge_file_failed_${res.status}`);
+  }
+  return res.json();
+}
+
+export async function openKnowledgeFile(baseUrl, token, id) {
+  const res = await fetch(`${baseUrl}/knowledge/open`, {
+    method: "POST",
+    headers: buildHeaders(token),
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `knowledge_open_failed_${res.status}`);
+  }
+  return res.json();
+}
+
 /**
  * Lance un skill ou un prompt et streame les events SSE.
  *
