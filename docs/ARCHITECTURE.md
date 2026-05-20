@@ -8,9 +8,9 @@
 │                  https://leomarty1.github.io/lynxview/                    │
 │                                                                          │
 │   ┌─────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────┐  │
-│   │ SkillRunner │   │ StreamPanel  │   │ HubSpotQueue │   │ History  │  │
-│   │ + auto-     │   │ (markdown +  │   │ GitHubBoard  │   │ (local-  │  │
-│   │   suggest   │   │  tool calls) │   │ (cache 5min) │   │  Storage)│  │
+│   │ SkillRunner │   │ StreamPanel  │   │ GitHubBoard  │   │ History  │  │
+│   │ + auto-     │   │ (markdown +  │   │ (cache 5min) │   │ (local-  │  │
+│   │   suggest   │   │  tool calls) │   │              │   │  Storage)│  │
 │   └─────┬───────┘   └──────┬───────┘   └──────┬───────┘   └────┬─────┘  │
 │         │                  │                  │                │        │
 │         └──── fetch + SSE / GET cache (Bearer token) ──────────┘        │
@@ -20,19 +20,23 @@
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                       BRIDGE Node Express (local)                         │
 │                                                                          │
-│   ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐ │
-│   │ /status │  │ /skills  │  │ /run     │  │ /hubspot │  │ /github    │ │
-│   │ noauth  │  │ (scan    │  │ SSE      │  │ REST     │  │ GraphQL    │ │
-│   │         │  │  mtime)  │  │ stream   │  │ direct   │  │ direct     │ │
-│   └─────────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬──────┘ │
-│                     │             │             │              │        │
-│                     ▼             ▼             ▼              ▼        │
-│           ┌──────────────┐ ┌──────────────┐ ┌──────────┐ ┌──────────┐  │
-│           │ lynxter-     │ │ spawn        │ │ HubSpot  │ │ GitHub   │  │
-│           │ support-cc/  │ │ node cli.js  │ │ API REST │ │ GraphQL  │  │
-│           │ skills/*.md  │ │ --print      │ │ + Private│ │ + PAT    │  │
-│           │ references/  │ │ stream-json  │ │ App      │ │ classic  │  │
-│           └──────────────┘ └──────┬───────┘ └──────────┘ └──────────┘  │
+│   ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                │
+│   │ /status │  │ /skills  │  │ /run     │  │ /github  │                │
+│   │ noauth  │  │ (scan    │  │ SSE      │  │ GraphQL  │                │
+│   │         │  │  mtime)  │  │ stream   │  │ direct   │                │
+│   └─────────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘                │
+│                     │             │             │                      │
+│                     ▼             ▼             ▼                      │
+│           ┌──────────────┐ ┌──────────────┐ ┌──────────┐               │
+│           │ lynxter-     │ │ spawn        │ │ GitHub   │               │
+│           │ support-cc/  │ │ node cli.js  │ │ GraphQL  │               │
+│           │ skills/*.md  │ │ --print      │ │ + PAT    │               │
+│           │ references/  │ │ stream-json  │ │ classic  │               │
+│           └──────────────┘ └──────┬───────┘ └──────────┘               │
+│                                                                        │
+│  Routes /hubspot/* + hubspot-oauth.js conservées DORMANTES — pas      │
+│  appelées par l'UI v0.3.1+ (Léo n'a ni Private App admin ni           │
+│  Developer Account, voir README).                                      │
 │                                   │                                     │
 │                            (claude CC + plugin                          │
 │                             lynxter-support installé)                   │
@@ -43,6 +47,11 @@
 MCPs OAuth claude.ai (inaccessibles en headless). Ils parlent directement aux
 APIs avec des tokens locaux stockés dans `%APPDATA%\lynxter-bridge\`. Le bridge
 est ainsi 100% fonctionnel sans dépendre de sessions claude.ai interactives.
+
+**Changement v0.3.1** : panel HubSpot retiré de l'UI (Léo n'a ni Private App
+admin ni Developer Account). Code bridge conservé dormant pour réactivation
+future facile (réimporter `HubSpotQueue` dans `App.jsx` + déposer un token
+dans `%APPDATA%\lynxter-bridge\hubspot-token.txt` suffit).
 
 ## Choix d'architecture
 

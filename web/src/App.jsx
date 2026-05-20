@@ -7,8 +7,12 @@ import TokenSetup from "./components/TokenSetup.jsx";
 import SkillRunner from "./components/SkillRunner.jsx";
 import StreamPanel from "./components/StreamPanel.jsx";
 import History from "./components/History.jsx";
-import HubSpotQueue from "./components/HubSpotQueue.jsx";
 import GitHubBoard from "./components/GitHubBoard.jsx";
+// HubSpotQueue retiré v0.3.1 : pas d'accès Private App (admin Lynxter requis)
+// ni Developer Account côté Léo. Le module bridge hubspot.js + hubspot-oauth.js
+// reste dormant — réactivable en remettant ici l'import + le panel si un jour
+// un admin Lynxter fournit une Private App token (dépose dans
+// %APPDATA%/lynxter-bridge/hubspot-token.txt).
 import { Logo, Baseline, Wordmark, ProductName } from "./components/Brand.jsx";
 import { fetchSkills, runSkill } from "./lib/api.js";
 import { Token, BaseUrl, History as HistStore } from "./lib/storage.js";
@@ -194,16 +198,9 @@ export default function App() {
           </div>
         </section>
 
-        {/* Right rail */}
+        {/* Right rail — GitHub Board en pleine hauteur (HubSpot retiré v0.3.1) */}
         <aside className="flex h-full min-h-0 flex-col gap-4">
-          <div className="lx-card h-1/2 p-3">
-            <HubSpotQueue
-              baseUrl={baseUrl}
-              token={token}
-              onUseTicket={handleSourceClick}
-            />
-          </div>
-          <div className="lx-card h-1/2 p-3">
+          <div className="lx-card h-full p-3">
             <GitHubBoard
               baseUrl={baseUrl}
               token={token}

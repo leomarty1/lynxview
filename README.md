@@ -78,51 +78,30 @@ le pb des MCPs claude.ai inaccessibles en headless.
 
 Tokens stockés dans `%APPDATA%\lynxter-bridge\` (jamais commités) :
 
-### HubSpot — flow OAuth Public App (recommandé, pas besoin d'admin)
+### HubSpot — retiré de l'UI (v0.3.1)
 
-Depuis la v0.3, LYNXVIEW utilise un flow OAuth user-level qui **ne nécessite
-pas d'être admin** du portal HubSpot Lynxter. Tu crées une "Public App" sur
-ton propre compte HubSpot Developer (gratuit, indépendant), tu l'autorises
-une fois avec ton compte Lynxter, et ça marche pour la vie.
+Le panneau HubSpot a été retiré de l'UI le 2026-05-19 : Léo n'a pas les
+droits admin Lynxter pour créer une Private App, et ne souhaite pas créer
+de compte HubSpot Developer pour faire l'OAuth Public App. Sans l'un ou
+l'autre, HubSpot ne peut pas être interrogé en headless.
 
-**Étape 1 — Créer la Public App (une seule fois)** :
+Le code bridge (`hubspot.js`, `hubspot-oauth.js`, routes `/hubspot/*` et
+`/oauth/hubspot/callback`) est **conservé en dormant**. Pour réactiver
+le panneau plus tard :
 
-1. Va sur https://developers.hubspot.com → crée un compte si besoin
-2. **Apps → Create app → Public app**
-3. Onglet **Auth** :
-   - **Redirect URLs** : `http://localhost:5174/oauth/hubspot/callback`
-   - **Scopes** : `crm.objects.tickets.read`, `crm.objects.contacts.read`,
-     `crm.objects.companies.read`, `crm.objects.owners.read`
-4. **Create app**, récupère **Client ID** et **Client secret**
+- **Option A — Private App admin** : un admin Lynxter crée une Private App
+  read-only avec les scopes `tickets.read`+`contacts.read`+`companies.read`+
+  `owners.read`, te donne le token. Tu le déposes dans
+  `%APPDATA%\lynxter-bridge\hubspot-token.txt`. Tu remets l'import
+  `HubSpotQueue` dans `web/src/App.jsx` et tu redéploies.
+- **Option B — OAuth Public App** : tu crées un compte HubSpot Developer,
+  une Public App, et tu suis le flow OAuth déjà codé. Le code est prêt
+  dans le bridge, il suffit de déposer Client ID + Client Secret et de
+  remettre le panneau côté UI.
 
-**Étape 2 — Déposer les credentials côté bridge** :
-
-```powershell
-Set-Content -NoNewline -Path "$env:APPDATA\lynxter-bridge\hubspot-client-id.txt" -Value "<TON_CLIENT_ID>"
-Set-Content -NoNewline -Path "$env:APPDATA\lynxter-bridge\hubspot-client-secret.txt" -Value "<TON_CLIENT_SECRET>"
-```
-
-**Étape 3 — Cliquer "Connecter HubSpot" depuis LYNXVIEW** :
-
-Le panneau HubSpot dans l'UI affiche un bouton. Clic → fenêtre HubSpot →
-login avec ton compte Lynxter → accorde les scopes → la fenêtre se ferme
-toute seule. Le bridge a maintenant un `refresh_token` qui régénère un
-`access_token` à la volée à chaque appel API. Plus rien à faire.
-
-**Pour révoquer** : `POST /hubspot/oauth/logout` (ou supprime
-`%APPDATA%\lynxter-bridge\hubspot-refresh.txt`).
-
-### HubSpot — Private App (alternatif, si tu as les droits admin)
-
-Si un admin du portal Lynxter te crée une Private App, dépose son token dans
-`%APPDATA%\lynxter-bridge\hubspot-token.txt` — le bridge le détecte et
-court-circuite le flow OAuth. Plus simple côté setup mais nécessite l'admin.
-
-Scopes Private App requis :
-- `crm.objects.tickets.read`
-- `crm.objects.contacts.read`
-- `crm.objects.companies.read`
-- `crm.objects.owners.read`
+En attendant, **utilise HubSpot directement** dans l'app web officielle
+(`app.hubspot.com`) ou via le MCP HubSpot officiel dans ta session
+`claude` interactive (le connecteur est déjà actif chez toi).
 
 ### GitHub board
 
@@ -146,11 +125,11 @@ directement à la place de la queue/board.
 | Bridge local | ✅ Fonctionne | `npm run install:autostart` une fois |
 | Skills file-based (`/diagnostic`, `/draft-client`, `/rapport-terrain`, `/prediag`, `/safety-check`, `/refine`, `/learn`, `/msg-post-maintenance`) | ✅ Fonctionnent en streaming complet | — |
 | `/support` (point d'entrée) | ✅ Fonctionne | — |
-| Panel HubSpot (REST direct depuis le bridge) | ⚠️ Token manquant | Crée une Private App HubSpot (cf. section ci-dessus). Tant que le token n'est pas là, le panneau affiche les instructions de setup. |
+| Panel HubSpot | ❌ Retiré v0.3.1 | Pas d'accès Private App admin ni Developer Account. Voir section "HubSpot" pour réactiver si besoin. Utiliser `app.hubspot.com` directement ou MCP HubSpot via `claude` interactif. |
 | Panel GitHub Board (GraphQL direct depuis le bridge) | ✅ Live | Token GitHub déposé dans `%APPDATA%\lynxter-bridge\github-token.txt`. Cible par défaut LynxterAM #19. |
 | `/update-plugin`, `/bc-devis` | ✅/⚠️ | update-plugin OK. bc-devis = placeholder volontaire. |
 
-Important : depuis la v0.2.0, **HubSpot et GitHub ne passent plus par `claude --print`** mais directement par les APIs REST/GraphQL. Les skills `/hubspot` et `/github-board` du plugin restent utilisables en session Claude Code interactive (terminal classique).
+Important : depuis la v0.2.0, **GitHub ne passe plus par `claude --print`** mais directement par l'API GraphQL. Le skill `/github-board` du plugin reste utilisable en session Claude Code interactive (terminal classique).
 
 Au premier lancement de l'UI, elle te demande le **bridge token** (généré automatiquement au premier démarrage du bridge, stocké dans `%APPDATA%\lynxter-bridge\token.txt`). Tu colles le token une fois, c'est mémorisé en localStorage.
 
