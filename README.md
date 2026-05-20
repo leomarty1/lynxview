@@ -4,9 +4,9 @@
 >
 > **Production live** : https://leomarty1.github.io/lynxview/
 > **Repo** : leomarty1/lynxview (public — code uniquement, pas de KB ni de secret)
-> **Dossier local** : `C:\Users\leo.marty\Documents\Claude\lynxter-control\`
-> (le nom du dossier local est resté `lynxter-control` pour compatibilité
-> avec le raccourci shell:startup ; le projet et le repo s'appellent `lynxview`)
+> **Dossier local** : `C:\Users\leo.marty\Documents\Claude\lynxview\`
+> (renommé depuis `lynxter-control` le 2026-05-20 — cohérent avec le repo
+> et le nom du projet)
 
 Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le navigateur. Bridge Node qui parle à `claude` en headless, autostart silencieux Windows, streaming SSE des réponses.
 
