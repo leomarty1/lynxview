@@ -9,6 +9,12 @@ import { listSkills, getSkill } from "./skills.js";
 import { spawnClaude } from "./claude.js";
 import { getHubSpotQueue, clearHubSpotCache } from "./hubspot.js";
 import { getGitHubBoard, clearGitHubCache } from "./github.js";
+import {
+  buildAuthorizeUrl,
+  exchangeCodeForTokens,
+  getOAuthStatus as getHubSpotOAuthStatus,
+  logout as hubspotLogout,
+} from "./hubspot-oauth.js";
 
 export function createApp() {
   const app = express();
@@ -68,6 +74,65 @@ export function createApp() {
       version: "0.1.0",
       issuedAt: Date.now(),
     });
+  });
+
+  // /hubspot/oauth/start — démarre le flow OAuth en redirigeant vers HubSpot.
+  // Pas de auth bearer : c'est ouvert depuis l'UI via window.open (pas de
+  // header possible). Sécurité : (1) bridge bind 127.0.0.1 only, (2) le
+  // handler ne renvoie qu'un 302 vers HubSpot, pas d'info sensible, (3) le
+  // state random anti-CSRF est validé au callback.
+  app.get("/hubspot/oauth/start", (req, res) => {
+    const url = buildAuthorizeUrl();
+    if (!url) {
+      return res
+        .status(503)
+        .type("html")
+        .send(
+          renderOAuthPage(
+            "Configuration manquante",
+            "Client ID HubSpot absent. Dépose-le dans %APPDATA%/lynxter-bridge/hubspot-client-id.txt (et hubspot-client-secret.txt).",
+          ),
+        );
+    }
+    res.redirect(302, url);
+  });
+
+  // /oauth/hubspot/callback — HubSpot redirige le navigateur ici avec ?code&state.
+  // Hors auth (HubSpot ne peut pas signer notre bearer). Sécurité = state
+  // random validé une seule fois côté hubspot-oauth.js. Renvoie une page
+  // HTML qui se ferme toute seule en cas de succès.
+  app.get("/oauth/hubspot/callback", async (req, res) => {
+    const { code, state, error } = req.query;
+    if (error) {
+      return res
+        .status(400)
+        .type("html")
+        .send(renderOAuthPage("Erreur HubSpot", `HubSpot a refusé : ${error}`));
+    }
+    if (!code || !state) {
+      return res
+        .status(400)
+        .type("html")
+        .send(renderOAuthPage("Paramètres manquants", "code ou state absent."));
+    }
+    try {
+      await exchangeCodeForTokens(String(code), String(state));
+      clearHubSpotCache();
+      res
+        .type("html")
+        .send(
+          renderOAuthPage(
+            "HubSpot connecté ✓",
+            "Tu peux fermer cette fenêtre et revenir dans LYNXVIEW. La queue se peuplera au prochain refresh.",
+            true,
+          ),
+        );
+    } catch (err) {
+      res
+        .status(500)
+        .type("html")
+        .send(renderOAuthPage("Échange de token raté", err.message));
+    }
   });
 
   // Toutes les autres routes : auth obligatoire.
@@ -192,6 +257,18 @@ export function createApp() {
     res.json({ ok: true });
   });
 
+  // /hubspot/oauth/status — état du flow OAuth pour l'UI (sans secret leak).
+  app.get("/hubspot/oauth/status", (req, res) => {
+    res.json(getHubSpotOAuthStatus());
+  });
+
+  // /hubspot/oauth/logout — efface le refresh_token (pour reset/debug).
+  app.post("/hubspot/oauth/logout", (req, res) => {
+    hubspotLogout();
+    clearHubSpotCache();
+    res.json({ ok: true });
+  });
+
   // /github — board GitHub caché.
   app.get("/github", async (req, res) => {
     const refresh = req.query.refresh === "true";
@@ -215,6 +292,31 @@ export function createApp() {
   });
 
   return app;
+}
+
+// Petite page HTML rendue après le callback OAuth (succès ou erreur).
+// Auto-close possible via JS si on est arrivé via window.open.
+function renderOAuthPage(title, message, success = false) {
+  const color = success ? "#3a9d5d" : "#b03a2e";
+  return `<!doctype html>
+<html lang="fr"><head>
+<meta charset="utf-8"/>
+<title>${title} — LYNXVIEW</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background:#fafaf9; color:#403e3d; margin:0; padding:0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+  .card { max-width:480px; padding:2.5rem 2.25rem; background:#fff; border:1px solid #e8e6e3; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+  h1 { margin:0 0 0.75rem; font-size:1.25rem; font-weight:500; color:${color}; }
+  p  { margin:0; line-height:1.55; }
+  .baseline { margin-top:1.5rem; font-weight:800; color:#fdb913; letter-spacing:0.04em; font-size:0.875rem; text-transform:uppercase; }
+</style>
+</head><body>
+  <div class="card">
+    <h1>${title}</h1>
+    <p>${message}</p>
+    ${success ? '<script>setTimeout(()=>window.close(), 2500);</script>' : ""}
+    <p class="baseline">Lynxter — Make it smarter</p>
+  </div>
+</body></html>`;
 }
 
 export function startServer() {

@@ -78,21 +78,51 @@ le pb des MCPs claude.ai inaccessibles en headless.
 
 Tokens stockés dans `%APPDATA%\lynxter-bridge\` (jamais commités) :
 
-### HubSpot
+### HubSpot — flow OAuth Public App (recommandé, pas besoin d'admin)
 
-1. HubSpot → Settings → Integrations → **Private Apps** → Create a private app
-2. Onglet **Scopes** (les 5 scopes du bridge) :
-   - `crm.objects.tickets.read`
-   - `crm.objects.contacts.read`
-   - `crm.objects.companies.read`
-   - `crm.objects.owners.read`
-   - `crm.schemas.contacts.read`
-3. Copie le token, dépose-le dans `%APPDATA%\lynxter-bridge\hubspot-token.txt`
-4. Relance le bridge
+Depuis la v0.3, LYNXVIEW utilise un flow OAuth user-level qui **ne nécessite
+pas d'être admin** du portal HubSpot Lynxter. Tu crées une "Public App" sur
+ton propre compte HubSpot Developer (gratuit, indépendant), tu l'autorises
+une fois avec ton compte Lynxter, et ça marche pour la vie.
 
-> Si tu n'as pas les droits admin pour créer une Private App, demande à un
-> admin de la créer pour toi. En attendant, le panneau UI affiche les
-> instructions setup directement (pas d'erreur cryptique).
+**Étape 1 — Créer la Public App (une seule fois)** :
+
+1. Va sur https://developers.hubspot.com → crée un compte si besoin
+2. **Apps → Create app → Public app**
+3. Onglet **Auth** :
+   - **Redirect URLs** : `http://localhost:5174/oauth/hubspot/callback`
+   - **Scopes** : `crm.objects.tickets.read`, `crm.objects.contacts.read`,
+     `crm.objects.companies.read`, `crm.objects.owners.read`
+4. **Create app**, récupère **Client ID** et **Client secret**
+
+**Étape 2 — Déposer les credentials côté bridge** :
+
+```powershell
+Set-Content -NoNewline -Path "$env:APPDATA\lynxter-bridge\hubspot-client-id.txt" -Value "<TON_CLIENT_ID>"
+Set-Content -NoNewline -Path "$env:APPDATA\lynxter-bridge\hubspot-client-secret.txt" -Value "<TON_CLIENT_SECRET>"
+```
+
+**Étape 3 — Cliquer "Connecter HubSpot" depuis LYNXVIEW** :
+
+Le panneau HubSpot dans l'UI affiche un bouton. Clic → fenêtre HubSpot →
+login avec ton compte Lynxter → accorde les scopes → la fenêtre se ferme
+toute seule. Le bridge a maintenant un `refresh_token` qui régénère un
+`access_token` à la volée à chaque appel API. Plus rien à faire.
+
+**Pour révoquer** : `POST /hubspot/oauth/logout` (ou supprime
+`%APPDATA%\lynxter-bridge\hubspot-refresh.txt`).
+
+### HubSpot — Private App (alternatif, si tu as les droits admin)
+
+Si un admin du portal Lynxter te crée une Private App, dépose son token dans
+`%APPDATA%\lynxter-bridge\hubspot-token.txt` — le bridge le détecte et
+court-circuite le flow OAuth. Plus simple côté setup mais nécessite l'admin.
+
+Scopes Private App requis :
+- `crm.objects.tickets.read`
+- `crm.objects.contacts.read`
+- `crm.objects.companies.read`
+- `crm.objects.owners.read`
 
 ### GitHub board
 

@@ -1,12 +1,17 @@
-// hubspot.js — accès direct à l'API REST HubSpot avec Private App Token.
-// Bypass complet de claude --print et du MCP claude.ai HubSpot OAuth, qui
-// n'est pas accessible en mode headless.
+// hubspot.js — accès direct à l'API REST HubSpot.
 //
-// Token lu via tokens.js (env var ou %APPDATA%/lynxter-bridge/hubspot-token.txt).
-// Si absent : on retourne un texte d'aide pour guider Léo à créer le token.
+// Deux modes d'auth supportés (Private App ayant priorité pour rétrocompat) :
+//   1. Private App Token (legacy v0.2) — nécessite admin HubSpot, lu depuis
+//      %APPDATA%/lynxter-bridge/hubspot-token.txt
+//   2. OAuth Public App (v0.3+) — Léo crée la Public App sur son compte
+//      HubSpot Developer (pas besoin d'admin Lynxter). Le bridge gère le
+//      flow authorization_code + refresh_token automatique.
+//
+// Le mode OAuth est PRÉFÉRABLE car ne dépend pas d'un admin du portal.
 
 import { config } from "./config.js";
-import { getHubSpotToken } from "./tokens.js";
+import { getHubSpotPrivateAppToken } from "./tokens.js";
+import { getAccessToken, getOAuthStatus } from "./hubspot-oauth.js";
 
 let cache = { text: null, fetchedAt: 0, error: null };
 
@@ -41,28 +46,38 @@ async function hubspotGet(path, token) {
   return res.json();
 }
 
-function setupHelp() {
+function setupHelpClientCreds() {
   return [
-    "## HubSpot — token requis",
+    "## HubSpot — Public App à configurer",
     "",
-    "Le bridge n'a pas trouvé de token HubSpot. Pour activer le panneau :",
+    "Étape 1/2 : crée une **Public App** sur ton compte HubSpot Developer",
+    "(gratuit, indépendant du portal Lynxter — **pas besoin d'admin**).",
     "",
-    "1. Génère un Private App token sur HubSpot →",
-    "   Settings → Integrations → Private Apps → **Create a private app**",
-    "2. Donne-lui un nom (ex: `lynxview-bridge`).",
-    "3. Onglet **Scopes** → coche :",
-    "   - `crm.objects.tickets.read`",
-    "   - `crm.objects.contacts.read`",
-    "   - `crm.objects.companies.read`",
-    "   - `crm.schemas.contacts.read`",
-    "   - `crm.objects.owners.read`",
-    "4. **Create app** puis copie le token.",
-    "5. Crée le fichier `%APPDATA%\\lynxter-bridge\\hubspot-token.txt` et",
-    "   colle le token dedans (sans saut de ligne).",
-    "6. Relance le bridge (`npm run bridge`).",
+    "1. Va sur https://developers.hubspot.com (crée un compte si besoin)",
+    "2. **Apps → Create app → Public app**",
+    "3. Onglet **Auth** :",
+    "   - **Redirect URLs** : `http://localhost:5174/oauth/hubspot/callback`",
+    "   - **Scopes** : `crm.objects.tickets.read`, `crm.objects.contacts.read`,",
+    "     `crm.objects.companies.read`, `crm.objects.owners.read`",
+    "4. **Create app**, récupère **Client ID** et **Client secret**.",
+    "5. Dépose-les dans :",
+    "   - `%APPDATA%\\lynxter-bridge\\hubspot-client-id.txt`",
+    "   - `%APPDATA%\\lynxter-bridge\\hubspot-client-secret.txt`",
+    "6. Relance le bridge, puis clique le bouton **Connecter HubSpot** sur",
+    "   ce panneau (étape 2/2 — un seul clic pour autoriser).",
+  ].join("\n");
+}
+
+function setupHelpNeedsAuthorize() {
+  return [
+    "## HubSpot — un clic pour finaliser",
     "",
-    "Si tu ne peux pas créer une Private App au niveau org, une clé personnelle",
-    "fonctionne aussi tant qu'elle a les mêmes scopes.",
+    "Client ID + Client Secret configurés ✓",
+    "",
+    "Il ne reste qu'à autoriser l'app : clique le bouton **Connecter HubSpot**",
+    "ci-dessous. Tu seras redirigé vers HubSpot pour te logger avec ton compte",
+    "Lynxter (pas besoin d'être admin), accorder les scopes, puis tu reviens",
+    "ici et la queue se peuple.",
   ].join("\n");
 }
 
@@ -111,10 +126,63 @@ export async function getHubSpotQueue({ refresh = false } = {}) {
     return { ...cache, fromCache: true, ageMs: age };
   }
 
-  const token = getHubSpotToken();
+  // Résolution du token, dans cet ordre :
+  //   1. Private App Token (legacy) — si présent, priorité absolue
+  //   2. OAuth access token via refresh_token persistant
+  //   3. setupHelp adapté (configuration manquante ou autorisation à faire)
+  let token = getHubSpotPrivateAppToken();
+  let needsOAuth = false;
+
   if (!token) {
-    cache = { text: setupHelp(), fetchedAt: Date.now(), error: null };
-    return { ...cache, fromCache: false, ageMs: 0, missingToken: true };
+    const oauthStatus = getOAuthStatus();
+    if (!oauthStatus.hasClientId || !oauthStatus.hasClientSecret) {
+      // Étape 1 manquante : configurer la Public App.
+      cache = {
+        text: setupHelpClientCreds(),
+        fetchedAt: Date.now(),
+        error: null,
+      };
+      return {
+        ...cache,
+        fromCache: false,
+        ageMs: 0,
+        missingToken: true,
+        oauthSetup: "needs_client_creds",
+      };
+    }
+    if (!oauthStatus.hasRefreshToken) {
+      // Étape 2 manquante : Léo doit cliquer "Connecter HubSpot".
+      cache = {
+        text: setupHelpNeedsAuthorize(),
+        fetchedAt: Date.now(),
+        error: null,
+      };
+      return {
+        ...cache,
+        fromCache: false,
+        ageMs: 0,
+        missingToken: true,
+        oauthSetup: "needs_authorize",
+        needsOAuth: true,
+      };
+    }
+    // On a refresh_token → on récupère un access_token frais.
+    token = await getAccessToken();
+    if (!token) {
+      cache = {
+        text: setupHelpNeedsAuthorize(),
+        fetchedAt: Date.now(),
+        error: "refresh_failed",
+      };
+      return {
+        ...cache,
+        fromCache: false,
+        ageMs: 0,
+        missingToken: true,
+        needsOAuth: true,
+      };
+    }
+    needsOAuth = false;
   }
 
   try {

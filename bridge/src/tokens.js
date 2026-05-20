@@ -23,8 +23,42 @@ function readTokenFile(filename) {
   }
 }
 
-export function getHubSpotToken() {
+// HubSpot Private App token (legacy v0.2). Optionnel — si présent, il prime
+// sur le flow OAuth public app. Gardé pour les setups où un admin Lynxter
+// a déjà fourni une Private App à Léo.
+export function getHubSpotPrivateAppToken() {
   return process.env.HUBSPOT_TOKEN || readTokenFile("hubspot-token.txt");
+}
+
+// OAuth Public App credentials (v0.3+).
+// Stockés séparément du refresh token pour pouvoir effacer/régénérer chacun.
+export function getHubSpotClientId() {
+  return process.env.HUBSPOT_CLIENT_ID || readTokenFile("hubspot-client-id.txt");
+}
+
+export function getHubSpotClientSecret() {
+  return process.env.HUBSPOT_CLIENT_SECRET || readTokenFile("hubspot-client-secret.txt");
+}
+
+export function getHubSpotRefreshToken() {
+  return process.env.HUBSPOT_REFRESH_TOKEN || readTokenFile("hubspot-refresh.txt");
+}
+
+export function setHubSpotRefreshToken(token) {
+  ensureDir();
+  const target = path.join(config.dataDir, "hubspot-refresh.txt");
+  fs.writeFileSync(target, token, { mode: 0o600 });
+}
+
+export function clearHubSpotRefreshToken() {
+  const target = path.join(config.dataDir, "hubspot-refresh.txt");
+  if (fs.existsSync(target)) fs.unlinkSync(target);
+}
+
+function ensureDir() {
+  if (!fs.existsSync(config.dataDir)) {
+    fs.mkdirSync(config.dataDir, { recursive: true });
+  }
 }
 
 export function getGitHubToken() {

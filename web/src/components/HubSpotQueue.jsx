@@ -1,6 +1,12 @@
 // HubSpotQueue.jsx — panneau queue HubSpot, charte light.
+//
+// État OAuth :
+//   - data.needsOAuth = true → afficher un bouton "Connecter HubSpot" qui
+//     ouvre /hubspot/oauth/start dans une nouvelle fenêtre. Au focus
+//     retour de la fenêtre, on refetch automatiquement.
+//   - Sinon : afficher la queue (markdown) ou les instructions setup.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { fetchHubSpot } from "../lib/api.js";
@@ -11,8 +17,10 @@ export default function HubSpotQueue({ baseUrl, token, onUseTicket }) {
     fetchedAt: 0,
     error: null,
     fromCache: false,
+    needsOAuth: false,
   });
   const [loading, setLoading] = useState(false);
+  const oauthWindowRef = useRef(null);
 
   async function refresh({ force = false } = {}) {
     setLoading(true);
@@ -30,6 +38,30 @@ export default function HubSpotQueue({ baseUrl, token, onUseTicket }) {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Quand la fenêtre OAuth se ferme (Léo a fini d'autoriser), on refetch
+  // pour vérifier que le token est bien arrivé côté bridge.
+  useEffect(() => {
+    function onFocus() {
+      if (oauthWindowRef.current && oauthWindowRef.current.closed) {
+        oauthWindowRef.current = null;
+        // Petit délai pour laisser le bridge écrire le refresh_token.
+        setTimeout(() => refresh({ force: true }), 500);
+      }
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function startOAuth() {
+    const url = `${baseUrl}/hubspot/oauth/start`;
+    oauthWindowRef.current = window.open(
+      url,
+      "lynxview-hubspot-oauth",
+      "width=620,height=720,noopener=no",
+    );
+  }
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -65,6 +97,18 @@ export default function HubSpotQueue({ baseUrl, token, onUseTicket }) {
             </ReactMarkdown>
           </div>
         )}
+
+        {/* Bouton de connexion OAuth — apparait uniquement quand le bridge
+            est configuré (Client ID/Secret OK) mais pas encore autorisé. */}
+        {data.needsOAuth && (
+          <button
+            type="button"
+            onClick={startOAuth}
+            className="lx-btn-primary mt-3 w-full"
+          >
+            Connecter HubSpot
+          </button>
+        )}
       </div>
 
       <div className="flex items-center justify-between text-[0.7rem] text-lx-subtle">
@@ -83,8 +127,6 @@ export default function HubSpotQueue({ baseUrl, token, onUseTicket }) {
           type="button"
           onClick={() =>
             // Pointe vers /support (sait router selon le contenu collé).
-            // L'ancien target "hubspot" laissait le select dans un état invalide
-            // si le plugin /hubspot n'est pas listé tel quel après v0.2.
             onUseTicket?.({
               skill: "support",
               prompt: "Traite ce ticket HubSpot : (colle ID ou contenu)",
