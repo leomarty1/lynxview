@@ -1,96 +1,41 @@
-/* Lynxter Control — feuille de style globale, charte v3.1 */
+/* ============================================================
+   LYNXVIEW — feuille de style globale (v0.4 Atelier redesign)
+   ============================================================
+   - Google Fonts (Roboto + Outfit + JetBrains Mono)
+   - Import du CSS Atelier (design handoff, classes a-*)
+   - Tailwind layers pour les utility (flex, grid, spacing)
+   - Reset global minimal
+   ============================================================ */
 
-/* Polices : Roboto (body), Outfit (display + machines). GT America Expanded est
- * commercial — fallback Outfit. Chargement Google Fonts en preconnect. */
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;800&family=Roboto:wght@300;400;500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Outfit:wght@600;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+/* CSS Atelier complet — préserve toutes les classes a-* du design handoff.
+   Importé en premier pour que Tailwind utilities (plus bas) puissent surcharger
+   ponctuellement si nécessaire. */
+@import "./styles/atelier.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-  /* Renforce la couleur Lynxter quand un composant ne passe pas par Tailwind. */
-  --lx-text: #403e3d;
-  --lx-yellow: #fdb913;
-  --lx-blue: #2d4ea2;
-  --lx-border: #e8e6e3;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
+/* Reset + base */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
 body {
-  background-color: #ffffff;
-  color: var(--lx-text);
-  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-weight: 300; /* charte : Roboto Light pour le texte */
-  text-rendering: optimizeLegibility;
+  font-family: 'Roboto', system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 300;
+  color: var(--lx-anthracite);
+  background: #f5f4f1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Titres en Outfit (substitut open-source à GT America Expanded) — règle :
- * capitales pour les titres, minuscules pour les sous-titres. Le composant
- * applique l'une ou l'autre via une classe utilitaire. */
-h1,
-h2,
-h3,
-h4 {
-  font-family: "Outfit", "Roboto", system-ui, sans-serif;
-  font-weight: 400;
-  color: var(--lx-text);
-  letter-spacing: -0.005em;
-}
-
-/* Classe officielle "machine" — pour S300X, S600D, FIL11, LIQ21, etc.
- * Charte p.16 : Outfit ExtraBold, capitales, letter-spacing 0.09em. */
-.lx-machine {
-  font-family: "Outfit", system-ui, sans-serif;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-/* Baseline "MAKE IT SMARTER" — jaune Lynxter, Outfit ExtraBold, capitales.
- * Charte p.13 : utilisée en accompagnement du logo sur visuels majeurs. */
-.lx-baseline {
-  font-family: "Outfit", system-ui, sans-serif;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--lx-yellow);
-  letter-spacing: 0.04em;
-  line-height: 1;
-}
-
-/* Sélection texte */
-::selection {
-  background: rgba(253, 185, 19, 0.35);
-  color: var(--lx-text);
+  text-rendering: optimizeLegibility;
 }
 
 /* Scrollbars discrètes */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #d6d3cf;
-  border-radius: 5px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--lx-yellow);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d8d2c4; border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--lx-yellow); border: 2px solid transparent; background-clip: padding-box; }
 
 /* Focus ring uniforme charte */
 :focus-visible {
@@ -99,223 +44,46 @@ h4 {
   border-radius: 2px;
 }
 
-/* ====================================================================== */
-/* Rendu markdown dans le StreamPanel et les panneaux HubSpot/GitHub.       */
-/* Reste discret : pas de jaune sur petits textes (charte).                 */
-/* ====================================================================== */
-.markdown-body {
-  line-height: 1.6;
-  color: var(--lx-text);
-  font-size: 0.9375rem;
-}
-.markdown-body h1,
-.markdown-body h2,
-.markdown-body h3,
-.markdown-body h4 {
-  margin: 1.1rem 0 0.5rem;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
-.markdown-body h1 {
-  font-size: 1.4rem;
-  border-bottom: 1px solid var(--lx-border);
-  padding-bottom: 0.3rem;
-}
-.markdown-body h2 {
-  font-size: 1.2rem;
-}
-.markdown-body h3 {
-  font-size: 1.05rem;
-}
-.markdown-body p {
-  margin: 0.5rem 0;
-}
-.markdown-body ul,
-.markdown-body ol {
-  margin: 0.5rem 0 0.5rem 1.5rem;
-}
-.markdown-body ul {
-  list-style: disc;
-}
-.markdown-body ol {
-  list-style: decimal;
-}
-.markdown-body code {
-  background: #f4f2ef;
-  border: 1px solid var(--lx-border);
-  border-radius: 3px;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.875em;
-  font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas,
-    monospace;
-  color: #2d4ea2; /* bleu Lynxter pour les détails techniques (charte p.10) */
-}
-.markdown-body pre {
-  background: #fafaf9;
-  border: 1px solid var(--lx-border);
-  border-radius: 6px;
-  padding: 0.85rem 1rem;
-  overflow-x: auto;
-  margin: 0.6rem 0;
-}
-.markdown-body pre code {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  color: var(--lx-text);
-}
-.markdown-body table {
-  border-collapse: collapse;
-  margin: 0.7rem 0;
-  font-size: 0.875rem;
-}
-.markdown-body th,
-.markdown-body td {
-  border: 1px solid var(--lx-border);
-  padding: 0.4rem 0.7rem;
-  text-align: left;
-}
-.markdown-body th {
-  background: #fafaf9;
-  font-weight: 500;
-}
-.markdown-body blockquote {
-  border-left: 3px solid var(--lx-yellow);
-  padding-left: 0.85rem;
-  color: #6a6866;
-  margin: 0.6rem 0;
-  font-style: italic;
-}
-.markdown-body a {
-  color: var(--lx-blue);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-.markdown-body a:hover {
-  color: var(--lx-text);
-}
-.markdown-body hr {
-  border: 0;
-  border-top: 1px solid var(--lx-border);
-  margin: 1rem 0;
-}
+/* ============================================================
+   Markdown — extensions sur .a-md du design handoff
+   ============================================================ */
 
-/* ====================================================================== */
-/* Composants utilitaires Lynxter                                          */
-/* ====================================================================== */
-
-/* Bouton primaire : fond jaune Lynxter + texte gris foncé.
- * Taille obligatoirement ≥ 20pt visuel (text-base = 16px ≈ 12pt, on force
- * text-sm + py généreux pour rester légal charte). */
-.lx-btn-primary {
-  background: var(--lx-yellow);
-  color: var(--lx-text);
-  font-weight: 500;
-  font-size: 0.9375rem;
-  padding: 0.55rem 1.1rem;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  transition: filter 120ms ease, transform 120ms ease;
-}
-.lx-btn-primary:hover {
-  filter: brightness(0.95);
-}
-.lx-btn-primary:active {
-  transform: translateY(1px);
-}
-.lx-btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Bouton secondaire : contour gris Lynxter sur fond blanc. */
-.lx-btn-secondary {
-  background: #ffffff;
-  color: var(--lx-text);
-  font-weight: 400;
-  font-size: 0.875rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 4px;
-  border: 1px solid var(--lx-text);
-  transition: background 120ms ease;
-}
-.lx-btn-secondary:hover {
-  background: #fafaf9;
-}
-
-/* Bouton danger : pour Arrêter / supprimer. */
-.lx-btn-danger {
-  background: #b03a2e;
-  color: #ffffff;
-  font-weight: 500;
-  font-size: 0.9375rem;
-  padding: 0.55rem 1.1rem;
-  border-radius: 4px;
-  border: 1px solid transparent;
-}
-.lx-btn-danger:hover {
-  filter: brightness(0.92);
-}
-
-/* Card / panel : bordure discrète, ombre légère, fond blanc.
- * Aligne à gauche par défaut (charte). */
-.lx-card {
-  background: #ffffff;
-  border: 1px solid var(--lx-border);
-  border-radius: 6px;
-  box-shadow: 0 1px 0 rgba(64, 62, 61, 0.04),
-    0 1px 3px rgba(64, 62, 61, 0.06);
-}
-
-/* Tag/pill discret pour les flags (sensitive, etc.) — petits donc PAS jaune.
- * On utilise le bleu Lynxter (détails, charte p.10). */
-.lx-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: var(--lx-blue);
-  color: #ffffff;
-  font-size: 0.7rem;
-  font-weight: 500;
-  padding: 0.1rem 0.45rem;
-  border-radius: 3px;
-  letter-spacing: 0.02em;
-}
-
-/* Indicateur statut bridge — pastille colorée + texte. */
-.lx-dot {
+.streaming-caret {
   display: inline-block;
   width: 8px;
-  height: 8px;
-  border-radius: 999px;
-}
-.lx-dot--ok {
-  background: #3a9d5d;
-  box-shadow: 0 0 0 2px rgba(58, 157, 93, 0.18);
-}
-.lx-dot--err {
-  background: #b03a2e;
-  box-shadow: 0 0 0 2px rgba(176, 58, 46, 0.18);
+  height: 14px;
+  background: var(--lx-yellow);
+  animation: blink 0.8s infinite;
+  vertical-align: -2px;
+  margin-left: 2px;
 }
 
-/* Inputs */
-.lx-input {
-  background: #ffffff;
-  color: var(--lx-text);
-  border: 1px solid var(--lx-border);
-  border-radius: 4px;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.9375rem;
-  font-family: inherit;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+.a-md pre {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 12px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
-.lx-input:focus {
-  border-color: var(--lx-yellow);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(253, 185, 19, 0.22);
+.a-md pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--ink);
+  font-size: inherit;
 }
-.lx-input--mono {
-  font-family: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas,
-    monospace;
+.a-md table { border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+.a-md th, .a-md td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+.a-md th { background: var(--surface-2); font-weight: 600; }
+.a-md blockquote {
+  border-left: 3px solid var(--lx-yellow);
+  padding-left: 12px;
+  color: var(--ink-2);
+  margin: 12px 0;
+  font-style: italic;
 }
+.a-md a { color: var(--lx-blue); text-decoration: underline; text-underline-offset: 2px; }
+.a-md a:hover { color: var(--lx-anthracite); }
