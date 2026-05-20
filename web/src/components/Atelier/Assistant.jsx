@@ -101,12 +101,47 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       : "result";
 
   const filteredHistory = useMemo(() => {
-    if (histFilter === "all") return historyEntries;
-    if (histFilter === "fav") return historyEntries.filter((h) => h.fav);
-    return historyEntries.filter((h) => h.tag === histFilter);
+    // Vue "archive" : entrées archivées uniquement.
+    if (histFilter === "archive") {
+      return historyEntries.filter((h) => h.archived);
+    }
+    // Autres vues : exclure les archivées par défaut.
+    const visible = historyEntries.filter((h) => !h.archived);
+    if (histFilter === "all") return visible;
+    if (histFilter === "fav") return visible.filter((h) => h.fav);
+    return visible.filter((h) => h.tag === histFilter);
   }, [historyEntries, histFilter]);
 
+  const archiveCount = useMemo(
+    () => historyEntries.filter((h) => h.archived).length,
+    [historyEntries],
+  );
+
   const grouped = useMemo(() => groupByDate(filteredHistory), [filteredHistory]);
+
+  // Actions sur les entrées d'historique (archiver / désarchiver / supprimer)
+  const [confirmDelete, setConfirmDelete] = useState(null); // id ou null
+
+  const handleArchive = (id, e) => {
+    e.stopPropagation();
+    setHistoryEntries(HistStore.archive(id));
+  };
+  const handleUnarchive = (id, e) => {
+    e.stopPropagation();
+    setHistoryEntries(HistStore.unarchive(id));
+  };
+  const handleDelete = (id, e) => {
+    e.stopPropagation();
+    if (confirmDelete === id) {
+      setHistoryEntries(HistStore.remove(id));
+      setConfirmDelete(null);
+      if (activeHistId === id) setActiveHistId(null);
+    } else {
+      setConfirmDelete(id);
+      // Auto-reset du confirm après 3s pour éviter qu'il reste collé
+      setTimeout(() => setConfirmDelete((c) => (c === id ? null : c)), 3000);
+    }
+  };
 
   // Lancer un run
   const launch = useCallback(async () => {
@@ -184,7 +219,9 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       {/* ===== Historique (gauche) ===== */}
       <section className="a-col a-col--hist">
         <header className="a-col__head">
-          <h2 className="a-col__title">Historique</h2>
+          <h2 className="a-col__title">
+            {histFilter === "archive" ? "Archive" : "Historique"}
+          </h2>
           <span className="a-col__count">{filteredHistory.length} entrées</span>
         </header>
         <div className="a-hist__filters">
@@ -198,6 +235,17 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
               {f === "all" ? "Tout" : f === "fav" ? "Favoris" : f}
             </button>
           ))}
+          {archiveCount > 0 && (
+            <button
+              type="button"
+              className={`a-chip ${histFilter === "archive" ? "is-on" : ""}`}
+              onClick={() => setHistFilter("archive")}
+              title="Voir les entrées archivées"
+              style={{ marginLeft: "auto" }}
+            >
+              📦 {archiveCount}
+            </button>
+          )}
         </div>
         <div className="a-hist__list">
           {grouped.length === 0 && (
@@ -209,12 +257,17 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             <div key={date} className="a-hist__group">
               <div className="a-hist__date">{date}</div>
               {items.map((entry) => (
-                <button
+                <div
                   key={entry.id}
-                  type="button"
-                  onClick={() => handleHistClick(entry)}
-                  className={`a-hist__item ${entry.id === activeHistId ? "is-active" : ""}`}
+                  className="hist-card-wrapper"
+                  style={{ position: "relative" }}
                 >
+                  <button
+                    type="button"
+                    onClick={() => handleHistClick(entry)}
+                    className={`a-hist__item ${entry.id === activeHistId ? "is-active" : ""}`}
+                    style={{ paddingRight: histFilter === "archive" ? "42px" : "56px" }}
+                  >
                   <div className="a-hist__row1">
                     <span
                       className={`a-skill-pill a-skill-pill--${PILL_CLASS[entry.skill] || "github"}`}
@@ -230,11 +283,63 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
                     {entry.fav && <span className="a-hist__fav">★</span>}
                     <span className={`a-tag a-tag--${entry.tag || "doc"}`}>{entry.tag || "doc"}</span>
                   </div>
-                </button>
+                  </button>
+
+                  {/* Actions au survol : archiver/désarchiver + supprimer.
+                      Position absolue dans le wrapper relative pour éviter
+                      d'imbriquer des buttons dans un button (HTML invalide).
+                      Affichées via group-hover sur la wrapper. */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "8px",
+                      display: "flex",
+                      gap: "4px",
+                      opacity: 0,
+                      transition: "opacity 0.12s ease",
+                    }}
+                    className="hist-actions"
+                  >
+                    {histFilter === "archive" ? (
+                      <IconBtn
+                        title="Désarchiver"
+                        onClick={(e) => handleUnarchive(entry.id, e)}
+                      >
+                        ↩
+                      </IconBtn>
+                    ) : (
+                      <IconBtn
+                        title="Archiver"
+                        onClick={(e) => handleArchive(entry.id, e)}
+                      >
+                        📦
+                      </IconBtn>
+                    )}
+                    <IconBtn
+                      title={
+                        confirmDelete === entry.id
+                          ? "Confirmer la suppression"
+                          : "Supprimer"
+                      }
+                      onClick={(e) => handleDelete(entry.id, e)}
+                      danger
+                      pulsing={confirmDelete === entry.id}
+                    >
+                      {confirmDelete === entry.id ? "✓" : "🗑"}
+                    </IconBtn>
+                  </div>
+                </div>
               ))}
             </div>
           ))}
         </div>
+        <style>{`
+          .hist-card-wrapper:hover .hist-actions,
+          .hist-card-wrapper:focus-within .hist-actions {
+            opacity: 1 !important;
+          }
+        `}</style>
       </section>
 
       {/* ===== Conversation (centre) ===== */}
@@ -512,6 +617,50 @@ function ContextRail({ skill, setRoute, setSelectedSkill }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function IconBtn({ children, title, onClick, danger, pulsing }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      style={{
+        width: 24,
+        height: 24,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: pulsing
+          ? "var(--lx-red)"
+          : danger
+            ? "rgba(241,62,63,0.08)"
+            : "rgba(64,62,61,0.08)",
+        border: "none",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 12,
+        color: pulsing ? "#fff" : danger ? "var(--lx-red)" : "var(--ink-2)",
+        transition: "all 0.12s ease",
+        animation: pulsing ? "blink 0.8s infinite" : "none",
+      }}
+      onMouseEnter={(e) => {
+        if (pulsing) return;
+        e.currentTarget.style.background = danger
+          ? "rgba(241,62,63,0.18)"
+          : "rgba(64,62,61,0.16)";
+      }}
+      onMouseLeave={(e) => {
+        if (pulsing) return;
+        e.currentTarget.style.background = danger
+          ? "rgba(241,62,63,0.08)"
+          : "rgba(64,62,61,0.08)";
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

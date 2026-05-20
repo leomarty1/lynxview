@@ -38,20 +38,51 @@ export const BaseUrl = {
   set: (v) => save("baseUrl", v),
 };
 
-const MAX_HISTORY = 100;
+const MAX_HISTORY = 200; // élargi pour absorber l'archive
 
 export const History = {
   list: () => load("history", []),
+
   add: (entry) => {
     const items = load("history", []);
-    items.unshift({ ...entry, id: Date.now() + ":" + Math.random().toString(36).slice(2, 8) });
+    items.unshift({
+      ...entry,
+      id: Date.now() + ":" + Math.random().toString(36).slice(2, 8),
+      archived: false,
+    });
     while (items.length > MAX_HISTORY) items.pop();
     save("history", items);
     return items;
   },
+
   clear: () => save("history", []),
+
   remove: (id) => {
     const items = load("history", []).filter((e) => e.id !== id);
+    save("history", items);
+    return items;
+  },
+
+  // Archive : marque comme rangé sans le supprimer. Réversible via unarchive().
+  archive: (id) => {
+    const items = load("history", []).map((e) =>
+      e.id === id ? { ...e, archived: true, archivedAt: Date.now() } : e,
+    );
+    save("history", items);
+    return items;
+  },
+
+  unarchive: (id) => {
+    const items = load("history", []).map((e) =>
+      e.id === id ? { ...e, archived: false, archivedAt: undefined } : e,
+    );
+    save("history", items);
+    return items;
+  },
+
+  // Vide entièrement l'archive (purge définitive des entrées archivées).
+  clearArchive: () => {
+    const items = load("history", []).filter((e) => !e.archived);
     save("history", items);
     return items;
   },
