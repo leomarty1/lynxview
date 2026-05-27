@@ -158,16 +158,31 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       ? { skill: skillToUse, args: prompt }
       : { prompt };
 
+    // Track si le bridge a envoyé un event final ("end" ou "error").
+    // Si le stream se termine sans → déconnexion réseau, réponse tronquée.
+    let receivedFinal = false;
+
     try {
       await runSkill(
         baseUrl,
         token,
         body,
         (eventName, data) => {
+          if (eventName === "end" || eventName === "error") {
+            receivedFinal = true;
+          }
           setEvents((prev) => [...prev, { eventName, data }]);
         },
         controller.signal,
       );
+
+      // Stream terminé sans event final = disconnect (bridge tué, réseau coupé).
+      if (!receivedFinal && !controller.signal.aborted) {
+        setError(
+          "Connexion perdue avec le bridge — la réponse est probablement tronquée. Relance le skill.",
+        );
+      }
+
       // Sauve dans l'historique
       const entry = {
         startedAt: Date.now(),
@@ -427,6 +442,41 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
           </div>
         )}
 
+        {phase !== "idle" && error && (
+          <div
+            role="alert"
+            style={{
+              margin: "8px 0",
+              padding: "10px 14px",
+              background: "rgba(241,62,63,0.08)",
+              border: "1px solid rgba(241,62,63,0.4)",
+              borderRadius: 10,
+              color: "var(--lx-red)",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>⚠</span>
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={launch}
+              className="a-btn"
+              style={{
+                marginLeft: "auto",
+                padding: "4px 10px",
+                fontSize: 11,
+                borderColor: "var(--lx-red)",
+                color: "var(--lx-red)",
+              }}
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
+
         {phase !== "idle" && (
           <ResponseBubble
             sessionId={sessionId}
@@ -465,6 +515,19 @@ function ResponseBubble({ sessionId, skill, prompt, assistantText, streaming, ev
     [events],
   );
 
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    if (!assistantText) return;
+    try {
+      await navigator.clipboard.writeText(assistantText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Fallback : sélection manuelle si Clipboard API refusée
+      setCopied(false);
+    }
+  };
+
   return (
     <div className="a-response">
       <header className="a-response__head">
@@ -478,12 +541,24 @@ function ResponseBubble({ sessionId, skill, prompt, assistantText, streaming, ev
             </span>
           )}
         </div>
-        <div className="a-response__actions">
+        <div className="a-response__actions" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {streaming && (
             <span className="a-streaming">
               <span className="a-streaming__dot" />
               streaming
             </span>
+          )}
+          {!streaming && assistantText && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="a-btn"
+              style={{ padding: "6px 12px", fontSize: "12px" }}
+              aria-label="Copier la réponse"
+              title="Copier la réponse dans le presse-papier"
+            >
+              {copied ? "✓ Copié" : "📋 Copier"}
+            </button>
           )}
         </div>
       </header>

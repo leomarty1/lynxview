@@ -2,7 +2,7 @@
 // Reprend les classes a-side / a-nav / a-bridge / a-darktog / a-user du
 // design handoff. Le routing est interne (useState), pas de router lib.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AtelierAssistant from "./Assistant.jsx";
 import AtelierGithub from "./Github.jsx";
 import AtelierTickets from "./Tickets.jsx";
@@ -16,9 +16,29 @@ const NAV = [
   { id: "knowledge", icon: "❋", label: "Knowledge", hint: "K" },
 ];
 
+// Mapping touche → route. Touches simples (sans modificateur).
+const KEY_TO_ROUTE = { a: "assistant", t: "tickets", g: "github", k: "knowledge" };
+
 export default function AtelierShell({ baseUrl, token, onReset }) {
   const [route, setRoute] = useState("assistant");
   const [dark, setDark] = useState(false);
+
+  // Raccourcis clavier A/T/G/K — actifs uniquement quand le focus n'est pas
+  // dans un champ de saisie (sinon Léo perd ses inputs quand il tape un mail).
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || e.target?.isContentEditable) return;
+      const target = KEY_TO_ROUTE[e.key.toLowerCase()];
+      if (target) {
+        e.preventDefault();
+        setRoute(target);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   return (
     <div

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import TokenSetup from "./components/TokenSetup.jsx";
 import AtelierShell from "./components/Atelier/Shell.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { Token, BaseUrl } from "./lib/storage.js";
 
 export default function App() {
@@ -27,15 +28,17 @@ export default function App() {
     setToken("");
   };
 
-  if (!token) {
-    return (
-      <TokenSetup
-        baseUrl={baseUrl}
-        onTokenSet={handleTokenSet}
-        onBaseUrlSet={handleBaseUrlSet}
-      />
-    );
-  }
-
-  return <AtelierShell baseUrl={baseUrl} token={token} onReset={handleReset} />;
+  return (
+    <ErrorBoundary>
+      {!token ? (
+        <TokenSetup
+          baseUrl={baseUrl}
+          onTokenSet={handleTokenSet}
+          onBaseUrlSet={handleBaseUrlSet}
+        />
+      ) : (
+        <AtelierShell baseUrl={baseUrl} token={token} onReset={handleReset} />
+      )}
+    </ErrorBoundary>
+  );
 }

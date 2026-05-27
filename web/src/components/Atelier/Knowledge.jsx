@@ -164,13 +164,75 @@ export default function AtelierKnowledge({ baseUrl, token }) {
 
         <div className="a-kb__list">
           {loading && filtered.length === 0 && (
-            <p style={{ color: "var(--ink-3)", fontSize: "13px", padding: "20px" }}>
-              Chargement de la KB…
-            </p>
+            <>
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <div
+                  key={i}
+                  className="a-kb__item"
+                  aria-hidden="true"
+                  style={{
+                    pointerEvents: "none",
+                    background: "var(--surface)",
+                    opacity: 0.6,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 60,
+                        height: 14,
+                        borderRadius: 4,
+                        background: "var(--surface-2)",
+                        animation: "kbskel 1.2s ease-in-out infinite",
+                      }}
+                    />
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 28,
+                        height: 14,
+                        borderRadius: 4,
+                        background: "var(--surface-2)",
+                        animation: "kbskel 1.2s ease-in-out infinite",
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 10,
+                      height: 14,
+                      width: `${50 + ((i * 17) % 40)}%`,
+                      background: "var(--surface-2)",
+                      borderRadius: 4,
+                      animation: "kbskel 1.2s ease-in-out infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      marginTop: 6,
+                      height: 10,
+                      width: "30%",
+                      background: "var(--surface-2)",
+                      borderRadius: 4,
+                      animation: "kbskel 1.2s ease-in-out infinite",
+                    }}
+                  />
+                </div>
+              ))}
+              <style>{`
+                @keyframes kbskel {
+                  0%, 100% { opacity: 0.55; }
+                  50% { opacity: 0.85; }
+                }
+              `}</style>
+            </>
           )}
           {!loading && filtered.length === 0 && (
             <p style={{ color: "var(--ink-3)", fontSize: "13px", padding: "20px" }}>
-              Aucun fichier trouvé.
+              {search.trim() || selectedCat !== "all"
+                ? "Aucun fichier ne correspond aux filtres."
+                : "Aucun fichier trouvé dans la KB."}
             </p>
           )}
           {filtered.map((item) => (
