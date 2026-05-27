@@ -49,14 +49,26 @@ Dans tous les cas, **l'UI parle au bridge local** sur `http://127.0.0.1:5174`. L
 
 URL publique live : **https://leomarty1.github.io/lynxview/**
 
-### Méthode actuelle — déploiement manuel depuis branche `gh-pages`
+### Méthode actuelle — workflow GitHub Actions (auto)
 
-Le déploiement se fait par push de la branche `gh-pages` qui contient
-directement le contenu buildé de `web/dist`. Le workflow GitHub Actions
-auto-deploy a été retiré (nécessite un PAT avec scope `workflow` ; pas
-indispensable pour le workflow actuel).
+Le déploiement est automatique via `.github/workflows/deploy-pages.yml`.
+À chaque push sur `main` qui touche `web/` ou les `package.json`, le
+workflow build et déploie via l'action officielle `actions/deploy-pages@v4`.
+Pas de PAT requis : le `GITHUB_TOKEN` de l'action a la permission `pages: write`.
 
-Rebuild + redeploy :
+**Setup une seule fois (à faire dans l'UI GitHub)** :
+
+1. https://github.com/leomarty1/lynxview/settings/pages
+2. **Source** : passer de "Deploy from a branch" à **"GitHub Actions"**
+3. Le prochain push sur `main` déclenchera le workflow.
+
+Tu peux aussi déclencher le workflow à la main depuis l'onglet **Actions**
+(bouton "Run workflow" sur `Deploy to GitHub Pages`).
+
+### Méthode legacy — déploiement manuel depuis branche `gh-pages`
+
+Conservée pour secours si le workflow tombe en panne. La branche `gh-pages`
+n'est plus utilisée par défaut (le workflow déploie via Pages artifacts).
 
 ```powershell
 cd C:\Users\leo.marty\Documents\Claude\lynxview
@@ -65,11 +77,14 @@ git worktree add tmp-gh-pages gh-pages
 Copy-Item -Path "web\dist\*" -Destination "tmp-gh-pages\" -Recurse -Force
 cd tmp-gh-pages
 git add -A
-git commit -m "deploy: rebuild UI"
+git commit -m "deploy: rebuild UI (manuel)"
 git push origin gh-pages
 cd ..
 git worktree remove tmp-gh-pages
 ```
+
+Pour utiliser cette méthode, repasser Settings > Pages en "Deploy from a branch"
+→ branche `gh-pages`.
 
 ## Connecter HubSpot et GitHub (panneaux droite UI)
 
