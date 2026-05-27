@@ -80,10 +80,11 @@ function migrateLegacyEntry(e) {
     title: e.title || (e.prompt || "").split("\n")[0].slice(0, 80) || "(sans titre)",
     skill: e.skill || "",
     tag: e.tag || "doc",
-    client: e.client || "—",
+    client: e.client && e.client !== "—" ? e.client : "",
     fav: !!e.fav,
     archived: !!e.archived,
     archivedAt: e.archivedAt,
+    status: e.archived ? "archived" : "in_progress", // workflow status
     createdAt: e.startedAt || Date.now(),
     updatedAt: e.startedAt || Date.now(),
     claudeSessionId: e.claudeSessionId || null,
@@ -101,6 +102,13 @@ function migrateLegacyEntry(e) {
   };
 }
 
+// Migration intra-format : ajoute status sur les tickets v0.4.4 qui n'en
+// avaient pas (créés entre le refactor tickets et l'ajout du status).
+function ensureStatus(ticket) {
+  if (ticket.status) return ticket;
+  return { ...ticket, status: ticket.archived ? "archived" : "in_progress" };
+}
+
 function loadAndMigrate() {
   // Essaie la nouvelle clé `tickets`, puis fallback sur l'ancienne `history`.
   let items = load("tickets", null);
@@ -108,16 +116,27 @@ function loadAndMigrate() {
     const legacy = load("history", []);
     if (Array.isArray(legacy) && legacy.length > 0) {
       items = legacy.map((e) =>
-        isLegacyEntry(e) ? migrateLegacyEntry(e) : e,
+        isLegacyEntry(e) ? migrateLegacyEntry(e) : ensureStatus(e),
       );
       save("tickets", items);
     } else {
       items = [];
     }
-  } else if (items.some(isLegacyEntry)) {
-    // Au cas où des entrées partielles legacy aient été ajoutées par accident
-    items = items.map((e) => (isLegacyEntry(e) ? migrateLegacyEntry(e) : e));
-    save("tickets", items);
+  } else {
+    // Applique les migrations format au load (idempotent).
+    let needsSave = false;
+    items = items.map((e) => {
+      if (isLegacyEntry(e)) {
+        needsSave = true;
+        return migrateLegacyEntry(e);
+      }
+      if (!e.status) {
+        needsSave = true;
+        return ensureStatus(e);
+      }
+      return e;
+    });
+    if (needsSave) save("tickets", items);
   }
   return items;
 }
@@ -141,9 +160,10 @@ export const Tickets = {
         firstMessage.prompt.split("\n")[0].slice(0, 80) || "(sans titre)",
       skill: firstMessage.skill || "",
       tag: firstMessage.tag || "doc",
-      client: "—",
+      client: "",
       fav: false,
       archived: false,
+      status: "in_progress",
       createdAt: Date.now(),
       updatedAt: Date.now(),
       claudeSessionId: firstMessage.claudeSessionId || null,
@@ -196,7 +216,7 @@ export const Tickets = {
   archive: (ticketId) => {
     const items = loadAndMigrate().map((t) =>
       t.id === ticketId
-        ? { ...t, archived: true, archivedAt: Date.now() }
+        ? { ...t, archived: true, archivedAt: Date.now(), status: "archived" }
         : t,
     );
     save("tickets", items);
@@ -205,8 +225,27 @@ export const Tickets = {
 
   unarchive: (ticketId) => {
     const items = loadAndMigrate().map((t) =>
-      t.id === ticketId ? { ...t, archived: false, archivedAt: undefined } : t,
+      t.id === ticketId
+        ? { ...t, archived: false, archivedAt: undefined, status: "in_progress" }
+        : t,
     );
+    save("tickets", items);
+    return items;
+  },
+
+  /** Change le statut workflow du ticket. */
+  setStatus: (ticketId, status) => {
+    const items = loadAndMigrate().map((t) => {
+      if (t.id !== ticketId) return t;
+      return {
+        ...t,
+        status,
+        // Sync archived flag (compat) avec status archived
+        archived: status === "archived",
+        archivedAt: status === "archived" ? Date.now() : undefined,
+        updatedAt: Date.now(),
+      };
+    });
     save("tickets", items);
     return items;
   },

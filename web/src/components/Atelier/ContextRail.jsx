@@ -1,11 +1,7 @@
-// ContextRail.jsx — colonne droite de l'Assistant.
-//
-// Affiche :
-// 1. "Ticket courant" : titre + nb messages + skill principal du ticket
-//    actif (ou "brouillon" si pas encore créé).
-// 2. "Sources disponibles" : KB Lynxter + safety check auto.
-// 3. "Suite logique" : suggestions selon le skill courant.
+// ContextRail.jsx — colonne droite de l'Assistant. Affiche les méta du
+// ticket courant + permet d'éditer le client + changer le statut.
 
+import { useEffect, useState } from "react";
 import { suiteForSkill } from "../../lib/atelierHelpers.js";
 
 const SKILL_LABEL = {
@@ -25,12 +21,34 @@ const SKILL_LABEL = {
   hubspot: "HubSpot",
 };
 
+const STATUS_OPTS = [
+  { id: "in_progress", label: "🔵 En cours", color: "var(--lx-blue)" },
+  { id: "resolved", label: "✓ Résolu", color: "var(--lx-green)" },
+  { id: "archived", label: "📦 Archivé", color: "var(--ink-3)" },
+];
+
 export default function ContextRail({
   skill,
   setRoute,
   setSelectedSkill,
   currentTicket = null,
+  onSetClient,
+  onSetStatus,
 }) {
+  // Édition locale du champ client (commit au blur ou Entrée)
+  const [clientDraft, setClientDraft] = useState("");
+  useEffect(() => {
+    setClientDraft(currentTicket?.client || "");
+  }, [currentTicket?.id, currentTicket?.client]);
+
+  const commitClient = () => {
+    if (!currentTicket || !onSetClient) return;
+    const v = clientDraft.trim();
+    if (v !== (currentTicket.client || "")) {
+      onSetClient(v);
+    }
+  };
+
   return (
     <div className="a-ctx">
       <h3 className="a-ctx__title">Ticket courant</h3>
@@ -43,12 +61,60 @@ export default function ContextRail({
                 {currentTicket.title}
               </span>
             </div>
+
+            {/* Statut workflow — boutons radio compacts */}
+            <div className="a-ctx__row" style={{ alignItems: "flex-start" }}>
+              <span className="a-ctx__k">Statut</span>
+              <span className="a-ctx__v" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {STATUS_OPTS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`a-chip ${currentTicket.status === opt.id ? "is-on" : ""}`}
+                    onClick={() => onSetStatus?.(opt.id)}
+                    style={{ fontSize: 10, padding: "2px 8px" }}
+                    aria-pressed={currentTicket.status === opt.id}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </span>
+            </div>
+
+            {/* Client — éditable inline */}
+            <div className="a-ctx__row" style={{ alignItems: "flex-start" }}>
+              <span className="a-ctx__k">Client</span>
+              <span className="a-ctx__v" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={clientDraft}
+                  onChange={(e) => setClientDraft(e.target.value)}
+                  onBlur={commitClient}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  placeholder="DJO, SKF, Saxion…"
+                  className="a-search"
+                  style={{
+                    width: "100%",
+                    fontSize: 12,
+                    padding: "4px 10px",
+                  }}
+                  aria-label="Nom du client pour ce ticket"
+                />
+              </span>
+            </div>
+
             <div className="a-ctx__row">
               <span className="a-ctx__k">Messages</span>
               <span className="a-ctx__v">
                 💬 {currentTicket.messages?.length || 0}
               </span>
             </div>
+
             {currentTicket.skill && (
               <div className="a-ctx__row">
                 <span className="a-ctx__k">Skill</span>
@@ -59,6 +125,7 @@ export default function ContextRail({
                 </span>
               </div>
             )}
+
             {currentTicket.claudeSessionId && (
               <div className="a-ctx__row">
                 <span className="a-ctx__k">Session</span>
@@ -96,16 +163,15 @@ export default function ContextRail({
                 Le ticket sera créé au premier Lancer.
               </span>
             </div>
+            {skill && SKILL_LABEL[skill] && (
+              <div className="a-ctx__row">
+                <span className="a-ctx__k">Skill prévu</span>
+                <span className="a-ctx__v" style={{ fontSize: "12px" }}>
+                  {SKILL_LABEL[skill]}
+                </span>
+              </div>
+            )}
           </>
-        )}
-
-        {skill && SKILL_LABEL[skill] && !currentTicket && (
-          <div className="a-ctx__row">
-            <span className="a-ctx__k">Skill prévu</span>
-            <span className="a-ctx__v" style={{ fontSize: "12px" }}>
-              {SKILL_LABEL[skill]}
-            </span>
-          </div>
         )}
       </div>
 

@@ -35,6 +35,10 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   // créé au prochain Lancer).
   const [currentTicketId, setCurrentTicketId] = useState(null);
   const [histFilter, setHistFilter] = useState("all");
+  // Filtre status (in_progress | resolved | archived | all) — distinct des
+  // tags qui catégorisent (urgent/client/sav/doc/dev).
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [searchQuery, setSearchQuery] = useState("");
   const [suggestion, setSuggestion] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const abortRef = useRef(null);
@@ -104,19 +108,53 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     running,
   ]);
 
-  // Liste filtrée des tickets pour l'historique
+  // Liste filtrée des tickets pour l'historique.
+  // 3 étages : statusFilter (workflow) → histFilter (tag/fav) → searchQuery.
   const filteredTickets = useMemo(() => {
-    if (histFilter === "archive") {
-      return tickets.filter((t) => t.archived);
+    let list = tickets;
+
+    // Étage 1 — statut workflow
+    if (statusFilter === "active") {
+      // Par défaut : ce qui n'est ni archivé ni résolu
+      list = list.filter((t) => t.status !== "archived" && t.status !== "resolved");
+    } else if (statusFilter === "resolved") {
+      list = list.filter((t) => t.status === "resolved");
+    } else if (statusFilter === "archived") {
+      list = list.filter((t) => t.status === "archived" || t.archived);
     }
-    const visible = tickets.filter((t) => !t.archived);
-    if (histFilter === "all") return visible;
-    if (histFilter === "fav") return visible.filter((t) => t.fav);
-    return visible.filter((t) => t.tag === histFilter);
-  }, [tickets, histFilter]);
+    // statusFilter === "all" : pas de filtre
+
+    // Étage 2 — tag/favoris
+    if (histFilter === "fav") {
+      list = list.filter((t) => t.fav);
+    } else if (histFilter !== "all") {
+      list = list.filter((t) => t.tag === histFilter);
+    }
+
+    // Étage 3 — recherche full-text (titre + client + 1er prompt)
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) => {
+        const hay = [
+          t.title || "",
+          t.client || "",
+          t.messages?.[0]?.prompt || "",
+        ]
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    return list;
+  }, [tickets, histFilter, statusFilter, searchQuery]);
 
   const archiveCount = useMemo(
-    () => tickets.filter((t) => t.archived).length,
+    () => tickets.filter((t) => t.status === "archived" || t.archived).length,
+    [tickets],
+  );
+  const resolvedCount = useMemo(
+    () => tickets.filter((t) => t.status === "resolved").length,
     [tickets],
   );
 
@@ -130,7 +168,7 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     [filteredTickets],
   );
 
-  // Actions sur les tickets (archive / désarchive / supprime)
+  // Actions sur les tickets (archive / désarchive / supprime / résoudre)
   const handleArchive = (ticketId, e) => {
     e.stopPropagation();
     setTickets(Tickets.archive(ticketId));
@@ -138,6 +176,16 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const handleUnarchive = (ticketId, e) => {
     e.stopPropagation();
     setTickets(Tickets.unarchive(ticketId));
+  };
+  const handleSetStatus = (ticketId, status) => {
+    setTickets(Tickets.setStatus(ticketId, status));
+  };
+  const handleSetClient = (ticketId, client) => {
+    setTickets(
+      Tickets.list().map((t) => (t.id === ticketId ? { ...t, client } : t)),
+    );
+    Tickets.update(ticketId, { client });
+    setTickets(Tickets.list());
   };
   const handleDelete = (ticketId, e) => {
     e.stopPropagation();
@@ -419,13 +467,19 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         grouped={groupedForHist}
         histFilter={histFilter}
         setHistFilter={setHistFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
         activeHistId={currentTicketId}
         archiveCount={archiveCount}
+        resolvedCount={resolvedCount}
         confirmDelete={confirmDelete}
         onHistClick={handleHistClick}
         onArchive={handleArchive}
         onUnarchive={handleUnarchive}
         onDelete={handleDelete}
+        onSetStatus={handleSetStatus}
       />
 
       {/* ===== Conversation (centre) =====
@@ -658,6 +712,8 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
               ? tickets.find((t) => t.id === currentTicketId)
               : null
           }
+          onSetClient={(c) => currentTicketId && handleSetClient(currentTicketId, c)}
+          onSetStatus={(s) => currentTicketId && handleSetStatus(currentTicketId, s)}
         />
       </section>
     </div>
