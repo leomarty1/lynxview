@@ -1,6 +1,6 @@
 {
   "name": "@lynxview/web",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "UI Vite + React + Tailwind pour piloter le plugin lynxter-support via le bridge local.",
   "type": "module",

@@ -195,6 +195,11 @@ export function createApp() {
 
     writeEvent("start", { prompt: fullPrompt, startedAt: Date.now() });
 
+    // Hard timeout côté bridge : un skill bloqué (claude CLI freezé) ne doit
+    // pas consommer un subprocess + interval indéfiniment.
+    const MAX_RUN_MS = 5 * 60 * 1000; // 5 min, large pour /diagnostic + KB
+    let runTimeout;
+
     // Garde anti double-callback : onClose et onError peuvent tous les deux
     // tirer sur certaines erreurs (spawn ENOENT). Sans cette garde, res.end()
     // serait appelé 2× → "write after end" et crash bridge.
@@ -203,17 +208,14 @@ export function createApp() {
       if (finalized) return;
       finalized = true;
       clearInterval(heartbeat);
-      clearTimeout(runTimeout);
+      if (runTimeout) clearTimeout(runTimeout);
       writeEvent(eventName, payload);
       try {
         res.end();
       } catch {}
     };
 
-    // Hard timeout côté bridge : un skill bloqué (claude CLI freezé) ne doit
-    // pas consommer un subprocess + interval indéfiniment.
-    const MAX_RUN_MS = 5 * 60 * 1000; // 5 min, large pour /diagnostic + KB
-    const runTimeout = setTimeout(() => {
+    runTimeout = setTimeout(() => {
       try {
         proc.kill();
       } catch {}
@@ -368,6 +370,6 @@ export function startServer() {
   const app = createApp();
   return app.listen(config.port, config.host, () => {
     console.log(`[lynxter-bridge] listening on http://${config.host}:${config.port}`);
-    console.log(`[lynxter-bridge] token: ${config.token.slice(0, 8)}...${config.token.slice(-4)} (full file: ${config.tokenFile})`);
+    console.log(`[lynxter-bridge] token: (full file: ${config.tokenFile})`);
   });
 }

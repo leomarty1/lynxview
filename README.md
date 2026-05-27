@@ -25,8 +25,9 @@ Web UI locale pour piloter le plugin Claude Code `lynxter-support` depuis le nav
 ## Installation
 
 ```powershell
-# 1. Installer les deps
-cd C:\Users\leo.marty\Documents\Claude\lynxter-control
+# 1. Cloner le repo (si pas déjà fait)
+git clone https://github.com/leomarty1/lynxview.git
+cd C:\Users\leo.marty\Documents\Claude\lynxview
 npm install
 
 # 2. Installer l'autostart silencieux (raccourci dans shell:startup)
@@ -58,7 +59,7 @@ indispensable pour le workflow actuel).
 Rebuild + redeploy :
 
 ```powershell
-cd C:\Users\leo.marty\Documents\Claude\lynxter-control
+cd C:\Users\leo.marty\Documents\Claude\lynxview
 npm run web:build
 git worktree add tmp-gh-pages gh-pages
 Copy-Item -Path "web\dist\*" -Destination "tmp-gh-pages\" -Recurse -Force
@@ -105,14 +106,31 @@ En attendant, **utilise HubSpot directement** dans l'app web officielle
 
 ### GitHub board
 
+Deux options selon ton appétit sécu :
+
+**Option A — Fine-grained PAT (recommandé)**
+Scope limité à l'org `LynxterAM` uniquement, lecture seule.
+
+1. https://github.com/settings/personal-access-tokens/new
+2. **Resource owner** : `LynxterAM` (ou ton user si board perso)
+3. **Repository access** : "All repositories" (ou seulement ceux du board)
+4. **Permissions**:
+   - Repository : `Issues: Read-only`, `Metadata: Read-only`, `Pull requests: Read-only`
+   - Organization : `Projects: Read-only`
+5. **Generate token**, dépose dans `%APPDATA%\lynxter-bridge\github-token.txt`
+
+**Option B — Classic PAT (plus rapide à créer, scope plus large)**
+⚠️ Le scope `repo` donne aussi **write** sur tous tes repos privés. Si le token fuite, un attaquant peut modifier tes commits.
+
 1. https://github.com/settings/tokens → **Generate new token (classic)**
-2. Scopes : `repo` + `read:project` + `read:org`
+2. Scopes : `repo` (full) + `read:project` + `read:org`
 3. Dépose dans `%APPDATA%\lynxter-bridge\github-token.txt`
-4. Si le board cible n'est pas `LynxterAM #19`, override via env :
-   - `LYNXVIEW_GITHUB_OWNER=<owner>`
-   - `LYNXVIEW_GITHUB_OWNER_TYPE=organization` (ou `user`)
-   - `LYNXVIEW_GITHUB_PROJECT=<number>`
-   - `LYNXVIEW_GITHUB_USER=<login pour filtrer les items>`
+
+**Override du board cible** (si pas `LynxterAM #19`) — variables d'env :
+- `LYNXVIEW_GITHUB_OWNER=<owner>`
+- `LYNXVIEW_GITHUB_OWNER_TYPE=organization` (ou `user`)
+- `LYNXVIEW_GITHUB_PROJECT=<number>`
+- `LYNXVIEW_GITHUB_USER=<login pour filtrer les items>`
 
 Si tokens absents, les panneaux UI affichent les instructions complètes
 directement à la place de la queue/board.
@@ -145,6 +163,7 @@ Au premier lancement de l'UI, elle te demande le **bridge token** (généré aut
 ## Désinstallation
 
 ```powershell
+cd C:\Users\leo.marty\Documents\Claude\lynxview
 npm run uninstall:autostart
 # Optionnel : supprimer %APPDATA%\lynxter-bridge pour repartir de zéro
 ```

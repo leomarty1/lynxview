@@ -1,45 +1,48 @@
-# Architecture — Lynxter Control
+# Architecture — Lynxview
 
-## Vue d'ensemble (v0.2)
+## Vue d'ensemble (v0.4 — Atelier redesign)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                  NAVIGATEUR — UI Vite/React (GitHub Pages)                │
 │                  https://leomarty1.github.io/lynxview/                    │
 │                                                                          │
-│   ┌─────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────┐  │
-│   │ SkillRunner │   │ StreamPanel  │   │ GitHubBoard  │   │ History  │  │
-│   │ + auto-     │   │ (markdown +  │   │ (cache 5min) │   │ (local-  │  │
-│   │   suggest   │   │  tool calls) │   │              │   │  Storage)│  │
-│   └─────┬───────┘   └──────┬───────┘   └──────┬───────┘   └────┬─────┘  │
-│         │                  │                  │                │        │
-│         └──── fetch + SSE / GET cache (Bearer token) ──────────┘        │
+│  AtelierShell : sidebar (4 routes) + main panel                         │
+│  ┌────────────┬───────────┬───────────┬───────────┐                     │
+│  │ Assistant  │ Tickets   │ Github    │ Knowledge │                     │
+│  │ (SSE+SkillP│ (HubSpot  │ (board    │ (KB scan +│                     │
+│  │  +History) │  dormant) │  GraphQL) │  preview) │                     │
+│  └─────┬──────┴─────┬─────┴─────┬─────┴────┬──────┘                     │
+│        │            │           │          │                            │
+│        └──── fetch + SSE / GET cache (Bearer token) ────────────────────┤
 └──────────────────────────────┼──────────────────────────────────────────┘
                                │ HTTP 127.0.0.1:5174 (jamais LAN, jamais cloud)
                                ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                       BRIDGE Node Express (local)                         │
 │                                                                          │
-│   ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                │
-│   │ /status │  │ /skills  │  │ /run     │  │ /github  │                │
-│   │ noauth  │  │ (scan    │  │ SSE      │  │ GraphQL  │                │
-│   │         │  │  mtime)  │  │ stream   │  │ direct   │                │
-│   └─────────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘                │
-│                     │             │             │                      │
-│                     ▼             ▼             ▼                      │
-│           ┌──────────────┐ ┌──────────────┐ ┌──────────┐               │
-│           │ lynxter-     │ │ spawn        │ │ GitHub   │               │
-│           │ support-cc/  │ │ node cli.js  │ │ GraphQL  │               │
-│           │ skills/*.md  │ │ --print      │ │ + PAT    │               │
-│           │ references/  │ │ stream-json  │ │ classic  │               │
-│           └──────────────┘ └──────┬───────┘ └──────────┘               │
-│                                                                        │
-│  Routes /hubspot/* + hubspot-oauth.js conservées DORMANTES — pas      │
-│  appelées par l'UI v0.3.1+ (Léo n'a ni Private App admin ni           │
-│  Developer Account, voir README).                                      │
-│                                   │                                     │
-│                            (claude CC + plugin                          │
-│                             lynxter-support installé)                   │
+│  ┌─────────┐ ┌───────────┐ ┌────────┐ ┌─────────┐ ┌──────────┐         │
+│  │ /status │ │/auth/local│ │/skills │ │ /run    │ │ /github  │         │
+│  │ noauth  │ │ noauth +  │ │ (scan  │ │ SSE     │ │ GraphQL  │         │
+│  │         │ │ CORS only │ │ mtime) │ │ stream  │ │ direct   │         │
+│  └─────────┘ └─────┬─────┘ └────┬───┘ └────┬────┘ └────┬─────┘         │
+│                    │            │          │           │                │
+│  ┌──────────────┐  │            ▼          ▼           ▼                │
+│  │ /knowledge   │  │   ┌──────────────┐ ┌──────┐ ┌──────────┐          │
+│  │ scan + open  │  │   │ lynxter-     │ │spawn │ │ GitHub   │          │
+│  │ Connaissance/│  │   │ support-cc/  │ │claude│ │ GraphQL  │          │
+│  └──────┬───────┘  │   │ skills/*.md  │ │--print│ │ + PAT   │          │
+│         │          │   │ references/  │ │stdin  │ │ FG/class.│          │
+│         ▼          │   └──────────────┘ └──┬───┘ └──────────┘          │
+│  ┌──────────────┐  │                       │                            │
+│  │ Connaissance/│  │                  (claude CC +                      │
+│  │ + references/│  │                   plugin lynxter-                  │
+│  └──────────────┘  │                   support installé)                │
+│                    └─→ token via CORS-protected /auth/local             │
+│                                                                          │
+│  Routes /hubspot/* + hubspot-oauth.js conservées DORMANTES — pas       │
+│  appelées par l'UI v0.3.1+ (Léo n'a ni Private App admin ni            │
+│  Developer Account, voir README).                                       │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -52,6 +55,13 @@ est ainsi 100% fonctionnel sans dépendre de sessions claude.ai interactives.
 admin ni Developer Account). Code bridge conservé dormant pour réactivation
 future facile (réimporter `HubSpotQueue` dans `App.jsx` + déposer un token
 dans `%APPDATA%\lynxter-bridge\hubspot-token.txt` suffit).
+
+**Changement v0.4** : refonte UI complète en "Atelier" — `App.jsx` orchestre
+`TokenSetup` (premier setup) puis `AtelierShell` (sidebar + 4 routes :
+Assistant / Tickets / Github / Knowledge). Nouvelle route bridge `/knowledge`
+qui scanne `Connaissance/` et `lynxter-support-cc/references/`. Auto-connect
+au mount via `/auth/local` (le clic "Connecter" n'apparaît plus que si CORS
+refuse ou bridge offline).
 
 ## Choix d'architecture
 
