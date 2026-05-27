@@ -222,6 +222,10 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       msgEventsAccumRef.current.set(msgId, []);
 
       let receivedFinal = false;
+      // Variable locale (closure synchrone) pour capturer le session_id
+      // Claude dès que le bridge l'émet. setMessages est async/batché en
+      // React 18 — ne pas lire le state pour ça plus tard, on aurait null.
+      let claudeSessionForThisRun = null;
 
       try {
         await runSkill(
@@ -232,14 +236,16 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             if (eventName === "end" || eventName === "error") {
               receivedFinal = true;
             }
-            // Capture le session_id Claude réel (émis dès le 1er event)
+            // Capture le session_id Claude (event synthétique émis par le
+            // bridge dès le 1er event system/init de Claude).
             if (eventName === "session" && data?.sessionId) {
+              claudeSessionForThisRun = data.sessionId;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === msgId ? { ...m, claudeSessionId: data.sessionId } : m,
                 ),
               );
-              return; // pas besoin de pousser cet event dans le fil
+              return;
             }
             const ev = { eventName, data };
             const accum = msgEventsAccumRef.current.get(msgId);
@@ -262,20 +268,12 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         const finalEvents = msgEventsAccumRef.current.get(msgId) || [];
         const finalAssistantText = collectAssistantText(finalEvents);
 
-        // Récupère le claudeSessionId qui a été capturé dans le state messages
-        let capturedClaudeSession = null;
-        setMessages((prev) => {
-          const cur = prev.find((m) => m.id === msgId);
-          if (cur?.claudeSessionId) capturedClaudeSession = cur.claudeSessionId;
-          return prev;
-        });
-
         // Sérialise le message pour le store ticket (pas d'events, juste le
         // texte final — ça suffit pour réafficher la conversation).
         const persistedMessage = {
           id: msgId,
           sessionId: newMsg.sessionId,
-          claudeSessionId: capturedClaudeSession,
+          claudeSessionId: claudeSessionForThisRun,
           prompt: promptSnapshot,
           skill: skillToUse,
           assistantText: finalAssistantText,
