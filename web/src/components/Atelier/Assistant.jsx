@@ -38,8 +38,9 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   // Marque qu'on affiche une entrée restaurée depuis l'historique (mode
   // lecture seule, pas de tools/stderr à montrer puisque non sauvegardés).
   const [restoredFromHistory, setRestoredFromHistory] = useState(false);
-  // Refs pour l'auto-scroll de la zone messages (chat-like : composer en bas).
-  const msgsRef = useRef(null);
+  // Refs pour l'auto-scroll : on suit le bas de la conversation pendant le
+  // streaming, mais sans déranger Léo s'il a scrollé pour relire.
+  const mainColRef = useRef(null);
   const msgsEndRef = useRef(null);
 
   // Charge la liste des skills depuis le bridge
@@ -80,12 +81,12 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const assistantText = useMemo(() => collectAssistantText(events), [events]);
   const phase = running ? "streaming" : events.length === 0 ? "idle" : "result";
 
-  // Auto-scroll smart : suit le bas tant que l'utilisateur est dans les
-  // 120 derniers px. Si il a scrollé vers le haut pour relire, on respecte
-  // sa position. Au clic sur une entrée historique (restored), on force
-  // un scroll initial vers le bas pour qu'il voie la conversation entière.
+  // Auto-scroll smart : suit le bas tant que Léo est dans les 120 derniers px.
+  // S'il a scrollé vers le haut pour relire, on respecte sa position. Au clic
+  // sur une entrée historique (restored), on force un scroll initial pour
+  // voir la conversation entière en bas.
   useEffect(() => {
-    const container = msgsRef.current;
+    const container = mainColRef.current;
     if (!container) return;
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
@@ -277,104 +278,11 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         onDelete={handleDelete}
       />
 
-      {/* ===== Conversation (centre) ===== */}
-      {/* Pattern chat : zone messages en haut (scrollable, prend l'espace),
-          composer fixé en bas. Auto-scroll smart au nouveau message. */}
-      <section className="a-col a-col--main">
-        <div className="a-msgs" ref={msgsRef}>
-          {/* Empty state — affiché tant qu'aucune conversation n'est en cours */}
-          {phase === "idle" && !error && (
-            <div className="a-empty">
-              <div className="a-empty__mark">✦</div>
-              <h2 className="a-empty__title">Lance un skill</h2>
-              <p className="a-empty__sub">
-                Tape ta question dans le composer en bas. Claude détectera le
-                skill pertinent ou tu peux le choisir manuellement.
-              </p>
-              <div className="a-empty__skills">
-                {(skills.slice(0, 6) || []).map((s) => (
-                  <button
-                    key={s.name}
-                    type="button"
-                    onClick={() => setSelectedSkill(s.name)}
-                    className="a-empty__skill"
-                  >
-                    <span className="a-empty__skillIcon">{ICON_MAP[s.name] || "⚙"}</span>
-                    <span className="a-empty__skillLbl">/{s.name}</span>
-                    <span className="a-empty__skillDesc">
-                      {(s.description || "").slice(0, 70)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {error && phase === "idle" && (
-            <div className="a-empty" style={{ borderColor: "var(--lx-red)" }}>
-              <div className="a-empty__mark" style={{ color: "var(--lx-red)" }}>
-                !
-              </div>
-              <h2 className="a-empty__title" style={{ color: "var(--lx-red)" }}>
-                Erreur
-              </h2>
-              <p className="a-empty__sub">{error}</p>
-            </div>
-          )}
-
-          {/* Bannière d'erreur compacte au-dessus de la bulle (cas SSE
-              disconnect quand on a déjà du texte affiché). */}
-          {phase !== "idle" && error && (
-            <div
-              role="alert"
-              style={{
-                padding: "10px 14px",
-                background: "rgba(241,62,63,0.08)",
-                border: "1px solid rgba(241,62,63,0.4)",
-                borderRadius: 10,
-                color: "var(--lx-red)",
-                fontSize: 13,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <span style={{ fontSize: 16 }}>⚠</span>
-              <span>{error}</span>
-              <button
-                type="button"
-                onClick={launch}
-                className="a-btn"
-                style={{
-                  marginLeft: "auto",
-                  padding: "4px 10px",
-                  fontSize: 11,
-                  borderColor: "var(--lx-red)",
-                  color: "var(--lx-red)",
-                }}
-              >
-                Réessayer
-              </button>
-            </div>
-          )}
-
-          {phase !== "idle" && (
-            <ResponseBubble
-              sessionId={sessionId}
-              skill={selectedSkill || suggestion?.name}
-              prompt={prompt}
-              assistantText={assistantText}
-              streaming={running}
-              events={events}
-              restored={restoredFromHistory}
-            />
-          )}
-
-          {/* Sentinel pour le scrollIntoView auto. */}
-          <div ref={msgsEndRef} />
-        </div>
-
-        {/* Composer fixé en bas — pattern chat classique */}
+      {/* ===== Conversation (centre) =====
+          Composer en HAUT, conversation en dessous qui s'écrit naturellement
+          vers le bas. Le scroll vit dans la section directement. */}
+      <section className="a-col a-col--main" ref={mainColRef}>
+        {/* Composer en haut */}
         <div className="a-composer">
           <div className="a-composer__top">
             <SkillPicker
@@ -456,6 +364,97 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             )}
           </div>
         </div>
+
+        {/* Empty state */}
+        {phase === "idle" && !error && (
+          <div className="a-empty">
+            <div className="a-empty__mark">✦</div>
+            <h2 className="a-empty__title">Lance un skill</h2>
+            <p className="a-empty__sub">
+              Tape ta question dans le composer ci-dessus. Claude détectera le
+              skill pertinent ou tu peux le choisir manuellement.
+            </p>
+            <div className="a-empty__skills">
+              {(skills.slice(0, 6) || []).map((s) => (
+                <button
+                  key={s.name}
+                  type="button"
+                  onClick={() => setSelectedSkill(s.name)}
+                  className="a-empty__skill"
+                >
+                  <span className="a-empty__skillIcon">{ICON_MAP[s.name] || "⚙"}</span>
+                  <span className="a-empty__skillLbl">/{s.name}</span>
+                  <span className="a-empty__skillDesc">
+                    {(s.description || "").slice(0, 70)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error && phase === "idle" && (
+          <div className="a-empty" style={{ borderColor: "var(--lx-red)" }}>
+            <div className="a-empty__mark" style={{ color: "var(--lx-red)" }}>
+              !
+            </div>
+            <h2 className="a-empty__title" style={{ color: "var(--lx-red)" }}>
+              Erreur
+            </h2>
+            <p className="a-empty__sub">{error}</p>
+          </div>
+        )}
+
+        {/* Bannière d'erreur compacte au-dessus de la bulle (cas SSE
+            disconnect quand on a déjà du texte affiché). */}
+        {phase !== "idle" && error && (
+          <div
+            role="alert"
+            style={{
+              padding: "10px 14px",
+              background: "rgba(241,62,63,0.08)",
+              border: "1px solid rgba(241,62,63,0.4)",
+              borderRadius: 10,
+              color: "var(--lx-red)",
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>⚠</span>
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={launch}
+              className="a-btn"
+              style={{
+                marginLeft: "auto",
+                padding: "4px 10px",
+                fontSize: 11,
+                borderColor: "var(--lx-red)",
+                color: "var(--lx-red)",
+              }}
+            >
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        {phase !== "idle" && (
+          <ResponseBubble
+            sessionId={sessionId}
+            skill={selectedSkill || suggestion?.name}
+            prompt={prompt}
+            assistantText={assistantText}
+            streaming={running}
+            events={events}
+            restored={restoredFromHistory}
+          />
+        )}
+
+        {/* Sentinel pour scrollIntoView auto. */}
+        <div ref={msgsEndRef} />
       </section>
 
       {/* ===== Contexte (droite) ===== */}
