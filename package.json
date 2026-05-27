@@ -17,7 +17,8 @@
     "dev": "concurrently \"npm:bridge:dev\" \"npm:web\"",
     "test": "npm run test --workspace bridge && npm run test --workspace web",
     "install:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-autostart.ps1",
-    "uninstall:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1"
+    "uninstall:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-autostart.ps1",
+    "restart": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lynxview-restart.ps1"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"

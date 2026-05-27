@@ -175,6 +175,22 @@ Au premier lancement de l'UI, elle te demande le **bridge token** (généré aut
 - Le token est dans `.gitignore` (jamais commité)
 - Pas d'API key Claude exposée — le bridge délègue à `claude` CLI qui utilise ta session locale
 
+## Mises à jour automatiques
+
+Depuis la v0.4.2, l'autostart Windows exécute `scripts/bridge-with-autoupdate.bat`
+qui fait **`git pull --ff-only` + `npm install --silent` + `npm run bridge`** à
+chaque login. Aucune intervention manuelle pour récupérer un commit poussé sur main.
+
+Pour update + restart **sans logout/login**, double-clique sur
+`scripts\lynxview-restart.bat` (ou `npm run restart` depuis le repo). Ça :
+1. Kill le bridge en cours (port 5174)
+2. `git pull --ff-only`
+3. `npm install --silent`
+4. Relance le bridge en console cachée via le même vbs que l'autostart
+
+Si le `git pull` échoue (offline, conflit local), le bridge est lancé quand même
+avec le code local. Les logs sont dans `bridge/bridge.log`.
+
 ## Désinstallation
 
 ```powershell

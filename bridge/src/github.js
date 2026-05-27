@@ -15,7 +15,7 @@ import {
   githubBoardConfig,
 } from "./tokens.js";
 
-let cache = { text: null, fetchedAt: 0, error: null };
+let cache = { text: null, board: null, fetchedAt: 0, error: null };
 
 const GITHUB_FETCH_TIMEOUT_MS = 15_000;
 
@@ -177,6 +177,76 @@ function assigneesOf(item) {
   return (c.assignees?.nodes || []).map((a) => a.login);
 }
 
+// Extrait les données structurées du project — utilisées par l'UI pour
+// rendre un kanban. Retourne aussi `text` (markdown) pour fallback.
+function extractBoardData(project, filterUser) {
+  if (!project) {
+    return {
+      boardTitle: null,
+      boardUrl: null,
+      columns: [],
+      totalCount: 0,
+      filterUser,
+    };
+  }
+  const allItems = project.items?.nodes || [];
+  const items = filterUser
+    ? allItems.filter((it) => assigneesOf(it).includes(filterUser))
+    : allItems;
+
+  // Group by status, dans l'ordre préférentiel.
+  const ORDER = [
+    "In progress",
+    "Today / In progress",
+    "Today",
+    "Validation",
+    "This week",
+    "Todo",
+    "Backlog",
+    "Stand-by",
+    "Done",
+    "—",
+  ];
+
+  const byStatus = new Map();
+  for (const it of items) {
+    const s = statusOf(it);
+    if (!byStatus.has(s)) byStatus.set(s, []);
+    byStatus.get(s).push(it);
+  }
+
+  const orderedStatuses = [...byStatus.keys()].sort((a, b) => {
+    const ia = ORDER.indexOf(a);
+    const ib = ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const columns = orderedStatuses.map((status) => ({
+    status,
+    cards: byStatus.get(status).map((it) => {
+      const c = it.content || {};
+      return {
+        type: c.__typename || "Unknown", // Issue | PullRequest | DraftIssue
+        number: c.number ?? null,
+        title: c.title || "(sans titre)",
+        url: c.url || null,
+        state: c.state || null,
+        priority: priorityOf(it),
+        labels: (c.labels?.nodes || []).map((l) => l.name).slice(0, 5),
+        assignees: (c.assignees?.nodes || []).map((a) => a.login),
+      };
+    }),
+  }));
+
+  return {
+    boardTitle: project.title || null,
+    boardUrl: project.url || null,
+    columns,
+    totalCount: items.length,
+    filterUser,
+  };
+}
+
 function formatBoard(project, filterUser) {
   if (!project) {
     return "## GitHub Board\n\nProjet introuvable ou inaccessible.";
@@ -250,7 +320,7 @@ export async function getGitHubBoard({ refresh = false } = {}) {
 
   let token = getGitHubToken();
   if (!token) {
-    cache = { text: setupHelp(), fetchedAt: Date.now(), error: null };
+    cache = { text: setupHelp(), board: null, fetchedAt: Date.now(), error: null };
     return { ...cache, fromCache: false, ageMs: 0, missingToken: true };
   }
 
@@ -290,20 +360,21 @@ export async function getGitHubBoard({ refresh = false } = {}) {
         `- Ton compte n'a pas accès à l'organisation \`${githubBoardConfig.owner}\`.`,
         "- Numéro de projet incorrect (override : `LYNXVIEW_GITHUB_PROJECT`).",
       ].join("\n");
-      cache = { text, fetchedAt: Date.now(), error: null };
+      cache = { text, board: null, fetchedAt: Date.now(), error: null };
       return { ...cache, fromCache: false, ageMs: 0 };
     }
 
     const text = formatBoard(project, githubBoardConfig.filterUser);
-    cache = { text, fetchedAt: Date.now(), error: null };
+    const board = extractBoardData(project, githubBoardConfig.filterUser);
+    cache = { text, board, fetchedAt: Date.now(), error: null };
     return { ...cache, fromCache: false, ageMs: 0 };
   } catch (err) {
     const errText = `## GitHub Board — erreur API\n\n\`${err.message}\``;
-    cache = { text: errText, fetchedAt: Date.now(), error: err.message };
+    cache = { text: errText, board: null, fetchedAt: Date.now(), error: err.message };
     return { ...cache, fromCache: false, ageMs: 0 };
   }
 }
 
 export function clearGitHubCache() {
-  cache = { text: null, fetchedAt: 0, error: null };
+  cache = { text: null, board: null, fetchedAt: 0, error: null };
 }

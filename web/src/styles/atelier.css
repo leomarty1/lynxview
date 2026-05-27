@@ -384,8 +384,10 @@ body {
 .a-ticket__cta .a-btn { justify-content: center; }
 
 /* ----- board ----- */
-.a-board { display: grid; grid-template-columns: repeat(6, minmax(220px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 12px; }
-.a-board__col { background: var(--surface-2); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 200px; }
+/* Flex au lieu de grid : nombre de colonnes variable selon le board GitHub
+   (status custom), scroll horizontal naturel si > viewport. */
+.a-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+.a-board__col { background: var(--surface-2); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 200px; flex: 0 0 260px; }
 .a-board__colHead { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; }
 .a-board__colTitle { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
 .a-board__count { font-family: 'JetBrains Mono', monospace; font-size: 10px; background: var(--surface); padding: 2px 7px; border-radius: 999px; color: var(--ink-3); }
