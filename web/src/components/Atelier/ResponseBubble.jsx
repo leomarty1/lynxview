@@ -3,8 +3,10 @@
 // barre d'actions sous le texte assistant (Copier / Régénérer / Éditer).
 
 import { useMemo, useState } from "react";
-import { renderMarkdown } from "../../lib/markdown.js";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { collectToolCalls } from "../../lib/atelierHelpers.js";
+import { copyMarkdownRich } from "../../lib/clipboard.js";
 
 export default function ResponseBubble({
   sessionId,
@@ -30,12 +32,13 @@ export default function ResponseBubble({
     [events],
   );
 
+  // copied : "rich" (HTML + plain), "plain" (fallback writeText), false
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     if (!assistantText) return;
     try {
-      await navigator.clipboard.writeText(assistantText);
-      setCopied(true);
+      const { format } = await copyMarkdownRich(assistantText);
+      setCopied(format);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
@@ -151,7 +154,11 @@ export default function ResponseBubble({
         >
           <div className="a-response__userlbl a-response__userlbl--ai">Claude</div>
           <div className="a-md" style={{ marginTop: "8px" }}>
-            {assistantText ? renderMarkdown(assistantText) : null}
+            {assistantText ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {assistantText}
+              </ReactMarkdown>
+            ) : null}
             {streaming && <span className="a-caret" />}
             {!streaming && !assistantText && !restored && (
               <p style={{ color: "var(--ink-3)", fontSize: "13px" }}>
@@ -185,9 +192,13 @@ export default function ResponseBubble({
                 onClick={handleCopy}
                 className="a-chip"
                 aria-label="Copier la réponse"
-                title="Copier la réponse Claude dans le presse-papier"
+                title="Copier la réponse Claude — mise en forme préservée pour Outlook/Gmail, texte propre pour Slack/terminal"
               >
-                {copied ? "✓ Copié" : "📋 Copier"}
+                {copied === "rich"
+                  ? "✓ Copié (mis en forme)"
+                  : copied === "plain"
+                    ? "✓ Copié (texte)"
+                    : "📋 Copier"}
               </button>
               {onRegenerate && (
                 <button

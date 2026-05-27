@@ -304,15 +304,106 @@ body {
 .a-response__userlbl--ai { color: var(--lx-yellow); }
 .a-response__userprompt p { margin: 6px 0 0; font-size: 13.5px; color: var(--ink); line-height: 1.45; }
 .a-response__ai .a-md { margin-top: 8px; }
+/* ===== Markdown rendering (a-md) =====
+   Couvre tout ce que react-markdown + remark-gfm peut produire : titres
+   h1-h6, paragraphes, listes ord/non-ord (avec nesting), blockquotes,
+   tables, code inline + code blocks, liens, hr, strong/em/del. */
 .a-md { font-size: 14px; line-height: 1.6; color: var(--ink); }
+.a-md > *:first-child { margin-top: 0; }
+.a-md > *:last-child { margin-bottom: 0; }
+
 .a-md p { margin: 0 0 14px; }
-.a-md h4 { font-family: 'Outfit', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; font-size: 13px; color: var(--ink); margin: 20px 0 8px; }
-.a-md h4:first-child { margin-top: 0; }
-.a-md ol { margin: 0 0 14px; padding-left: 28px; }
-.a-md ol li { padding: 2px 0; margin-bottom: 4px; }
+.a-md p:last-child { margin-bottom: 0; }
+
+/* Titres : Outfit display, hiérarchie claire */
+.a-md h1, .a-md h2, .a-md h3, .a-md h4, .a-md h5, .a-md h6 {
+  font-family: 'Outfit', sans-serif; font-weight: 800;
+  color: var(--ink); line-height: 1.25;
+  margin: 22px 0 10px;
+}
+.a-md h1 { font-size: 22px; letter-spacing: -0.01em; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+.a-md h2 { font-size: 18px; letter-spacing: 0; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.a-md h3 { font-size: 15.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--lx-anthracite); }
+.atelier--dark .a-md h3 { color: var(--lx-yellow); }
+.a-md h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; }
+.a-md h5, .a-md h6 { font-size: 12.5px; letter-spacing: 0.03em; color: var(--ink-2); }
+.a-md h1:first-child, .a-md h2:first-child, .a-md h3:first-child, .a-md h4:first-child { margin-top: 0; }
+
+/* Listes */
+.a-md ul, .a-md ol { margin: 0 0 14px; padding-left: 28px; }
+.a-md ul li, .a-md ol li { padding: 2px 0; margin-bottom: 4px; }
+.a-md ul li::marker { color: var(--lx-yellow); }
 .a-md ol li::marker { color: var(--lx-yellow); font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.a-md ul ul, .a-md ol ol, .a-md ul ol, .a-md ol ul { margin-top: 4px; margin-bottom: 4px; }
+
+/* Inline */
 .a-md code { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; background: var(--surface-2); padding: 1px 6px; border-radius: 5px; color: var(--lx-blue); }
 .a-md strong { font-weight: 700; color: var(--ink); }
+.a-md em { font-style: italic; }
+.a-md del { text-decoration: line-through; color: var(--ink-3); }
+.a-md a { color: var(--lx-blue); text-decoration: underline; text-underline-offset: 2px; }
+.a-md a:hover { color: var(--ink); }
+
+/* Code blocks (triple backtick) */
+.a-md pre {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.a-md pre code {
+  background: transparent; padding: 0; border-radius: 0;
+  color: var(--ink); font-size: 12.5px;
+}
+
+/* Blockquote */
+.a-md blockquote {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--lx-yellow);
+  background: var(--surface-2);
+  border-radius: 0 8px 8px 0;
+  color: var(--ink-2);
+  font-style: italic;
+}
+.a-md blockquote p:last-child { margin-bottom: 0; }
+
+/* Tables (GFM) */
+.a-md table {
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 13px;
+  width: 100%;
+}
+.a-md th, .a-md td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.a-md th {
+  background: var(--surface-2);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.a-md tbody tr:hover { background: var(--surface-2); }
+
+/* Horizontal rule */
+.a-md hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 18px 0;
+}
+
+/* Images (rare dans une réponse Claude mais possible) */
+.a-md img { max-width: 100%; height: auto; border-radius: 8px; }
 .a-caret { display: inline-block; width: 8px; height: 14px; background: var(--lx-yellow); animation: blink 0.8s infinite; vertical-align: -2px; margin-left: 2px; }
 
 /* ----- context column ----- */
