@@ -211,7 +211,16 @@ body {
 .a-tag--dev { background: rgba(64, 62, 61, 0.14); color: var(--ink); }
 
 /* ----- composer / main column ----- */
-.a-col--main { padding: 22px 26px; gap: 18px; overflow-y: auto; }
+/* Pattern chat : messages en haut (scrollables), composer fixé en bas.
+   Le min-height: 0 sur .a-msgs est crucial dans un parent flex pour
+   autoriser le overflow-y: auto à fonctionner. */
+.a-col--main { padding: 22px 26px; gap: 14px; overflow: hidden; }
+.a-msgs {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-right: 4px; /* évite que le contenu touche la scrollbar */
+}
+.a-composer { flex-shrink: 0; }
 
 .a-composer {
   background: var(--surface); border: 1px solid var(--line);
