@@ -1,12 +1,19 @@
-// github.js — accès direct à l'API GraphQL GitHub avec PAT classic.
-// Bypass complet de claude --print et de gh CLI (qui peut être non auth).
+// github.js — accès direct à l'API GraphQL GitHub.
 //
-// Token lu via tokens.js (env GH_TOKEN ou %APPDATA%/lynxter-bridge/github-token.txt).
+// Token résolu via tokens.js → cascade automatique :
+//   1. env GITHUB_TOKEN / GH_TOKEN
+//   2. fichier %APPDATA%/lynxter-bridge/github-token.txt
+//   3. `gh auth token` (zero-config)
+//
 // Board configurable via env (LYNXVIEW_GITHUB_OWNER, LYNXVIEW_GITHUB_PROJECT,
 // LYNXVIEW_GITHUB_USER) — défaut LynxterAM #19, filtré sur leomarty1.
 
 import { config } from "./config.js";
-import { getGitHubToken, githubBoardConfig } from "./tokens.js";
+import {
+  getGitHubToken,
+  invalidateGitHubToken,
+  githubBoardConfig,
+} from "./tokens.js";
 
 let cache = { text: null, fetchedAt: 0, error: null };
 
@@ -27,7 +34,9 @@ async function githubGraphQL(query, variables, token) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`GitHub HTTP ${res.status}: ${body.slice(0, 120)}`);
+    const err = new Error(`GitHub HTTP ${res.status}: ${body.slice(0, 120)}`);
+    err.status = res.status;
+    throw err;
   }
   const json = await res.json();
   if (json.errors && json.errors.length > 0) {
@@ -43,29 +52,44 @@ function setupHelp() {
   return [
     "## GitHub Board — token requis",
     "",
-    "Le bridge n'a pas trouvé de token GitHub. Deux options :",
+    "Le bridge a essayé 3 sources et n'a trouvé aucun token GitHub :",
     "",
-    "### Option A — Fine-grained PAT (recommandé, scope minimal)",
+    "1. `GITHUB_TOKEN` / `GH_TOKEN` (env)",
+    "2. `%APPDATA%\\lynxter-bridge\\github-token.txt`",
+    "3. `gh auth token` (GitHub CLI)",
+    "",
+    "### Option recommandée — GitHub CLI (zero-config)",
+    "",
+    "Si tu n'as pas encore `gh` :",
+    "1. Installe https://cli.github.com/ (ou `winget install GitHub.cli`)",
+    "2. Authentifie-toi :",
+    "   ```",
+    "   gh auth login",
+    "   ```",
+    "3. Ajoute le scope `read:project` (pas demandé par défaut) :",
+    "   ```",
+    "   gh auth refresh -s read:project,read:org",
+    "   ```",
+    "4. Relance le bridge — c'est tout. Le token rafraîchira tout seul.",
+    "",
+    "### Alternative — Fine-grained PAT (scope minimal)",
     "",
     "1. https://github.com/settings/personal-access-tokens/new",
     `2. **Resource owner** : \`${githubBoardConfig.owner}\``,
     "3. **Permissions** :",
     "   - Repository : `Issues: Read`, `Metadata: Read`, `Pull requests: Read`",
     "   - Organization : `Projects: Read`",
-    "4. Generate, copie le token.",
+    "4. Generate, copie le token, dépose-le dans",
+    "   `%APPDATA%\\lynxter-bridge\\github-token.txt`",
+    "5. Relance le bridge.",
     "",
-    "### Option B — Classic PAT (plus rapide à créer)",
+    "### Alternative — Classic PAT",
     "",
     "⚠️ Scope `repo` donne aussi write sur tous tes repos privés.",
     "",
     "1. https://github.com/settings/tokens → **Generate new token (classic)**",
     "2. Scopes : `repo` (full) + `read:project` + `read:org`",
-    "",
-    "### Dans tous les cas",
-    "",
-    "- Crée le fichier `%APPDATA%\\lynxter-bridge\\github-token.txt` et",
-    "  colle le token dedans (sans saut de ligne).",
-    "- Relance le bridge (`npm run bridge`).",
+    "3. Dépose dans `%APPDATA%\\lynxter-bridge\\github-token.txt`, relance le bridge.",
     "",
     `Si tu n'as pas accès à \`${githubBoardConfig.owner}\` sur GitHub, ce panneau`,
     "restera vide. Tu peux changer la cible via les variables d'env",
@@ -206,33 +230,69 @@ function formatBoard(project, filterUser) {
   return lines.join("\n");
 }
 
+async function runGraphQLWithToken(token) {
+  const query =
+    githubBoardConfig.ownerType === "user"
+      ? PROJECT_QUERY_USER
+      : PROJECT_QUERY_ORG;
+  return githubGraphQL(
+    query,
+    { owner: githubBoardConfig.owner, number: githubBoardConfig.projectNumber },
+    token,
+  );
+}
+
 export async function getGitHubBoard({ refresh = false } = {}) {
   const age = Date.now() - cache.fetchedAt;
   if (!refresh && cache.text && age < config.cacheTTL) {
     return { ...cache, fromCache: true, ageMs: age };
   }
 
-  const token = getGitHubToken();
+  let token = getGitHubToken();
   if (!token) {
     cache = { text: setupHelp(), fetchedAt: Date.now(), error: null };
     return { ...cache, fromCache: false, ageMs: 0, missingToken: true };
   }
 
   try {
-    const query =
-      githubBoardConfig.ownerType === "user"
-        ? PROJECT_QUERY_USER
-        : PROJECT_QUERY_ORG;
-
-    const data = await githubGraphQL(
-      query,
-      { owner: githubBoardConfig.owner, number: githubBoardConfig.projectNumber },
-      token,
-    );
+    let data;
+    try {
+      data = await runGraphQLWithToken(token);
+    } catch (err) {
+      // 401 = token expiré (typique avec gh auth token après refresh).
+      // On invalide le cache gh et on retente une fois avec le token frais.
+      if (err.status === 401) {
+        invalidateGitHubToken();
+        token = getGitHubToken();
+        if (!token) throw err;
+        data = await runGraphQLWithToken(token);
+      } else {
+        throw err;
+      }
+    }
     const project =
       githubBoardConfig.ownerType === "user"
         ? data?.user?.projectV2
         : data?.organization?.projectV2;
+
+    if (!project) {
+      // Scope manquant (read:project) ou pas d'accès à l'org : aide claire.
+      const text = [
+        `## GitHub Board — projet introuvable`,
+        "",
+        `Le token a fonctionné mais le projet \`${githubBoardConfig.owner} #${githubBoardConfig.projectNumber}\` est invisible.`,
+        "",
+        "Causes typiques :",
+        "- Scope `read:project` manquant. Si tu utilises `gh`, lance :",
+        "  ```",
+        "  gh auth refresh -s read:project,read:org",
+        "  ```",
+        `- Ton compte n'a pas accès à l'organisation \`${githubBoardConfig.owner}\`.`,
+        "- Numéro de projet incorrect (override : `LYNXVIEW_GITHUB_PROJECT`).",
+      ].join("\n");
+      cache = { text, fetchedAt: Date.now(), error: null };
+      return { ...cache, fromCache: false, ageMs: 0 };
+    }
 
     const text = formatBoard(project, githubBoardConfig.filterUser);
     cache = { text, fetchedAt: Date.now(), error: null };

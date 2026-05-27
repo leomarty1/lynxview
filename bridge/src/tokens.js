@@ -3,13 +3,15 @@
 // Les tokens ne sont jamais commités dans le repo. Ils sont stockés en clair
 // dans %APPDATA%/lynxter-bridge/<service>-token.txt (perms par défaut OS).
 //
-// Précédence :
-//   1. variable d'env (utile pour CI / override ponctuel)
-//   2. fichier %APPDATA%/lynxter-bridge/<service>-token.txt
-//   3. null (le caller décide comment dégrader)
+// Précédence GitHub (depuis v0.4.1) :
+//   1. variable d'env GITHUB_TOKEN / GH_TOKEN (utile pour CI / override)
+//   2. fichier %APPDATA%/lynxter-bridge/github-token.txt
+//   3. `gh auth token` (zero-config si Léo a fait `gh auth login`)
+//   4. null (le caller affiche setupHelp)
 
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { config } from "./config.js";
 
 function readTokenFile(filename) {
@@ -61,8 +63,56 @@ function ensureDir() {
   }
 }
 
+// Cache 5 min pour le token résolu via `gh auth token` (évite un spawn par
+// requête /github). invalidateGitHubToken() force la refetch (utilisé en
+// cas de 401 — token gh expiré entre temps).
+let ghTokenCache = { token: null, fetchedAt: 0 };
+const GH_TOKEN_TTL = 5 * 60 * 1000;
+
+function readGhAuthToken() {
+  try {
+    // gh auth token retourne le token en stdout (1 ligne, sans newline final
+    // garanti). timeout court : si gh est lent ou bloqué on abandonne.
+    const out = execSync("gh auth token", {
+      encoding: "utf8",
+      timeout: 3000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    return out.length > 0 ? out : null;
+  } catch {
+    // gh absent, pas loggé in, ou timeout — on dégrade silencieusement.
+    return null;
+  }
+}
+
 export function getGitHubToken() {
-  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || readTokenFile("github-token.txt");
+  // 1. env override
+  const envToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (envToken) return envToken;
+
+  // 2. fichier déposé manuellement
+  const fileToken = readTokenFile("github-token.txt");
+  if (fileToken) return fileToken;
+
+  // 3. gh CLI (cache 5 min)
+  const age = Date.now() - ghTokenCache.fetchedAt;
+  if (ghTokenCache.token && age < GH_TOKEN_TTL) {
+    return ghTokenCache.token;
+  }
+  const ghToken = readGhAuthToken();
+  if (ghToken) {
+    ghTokenCache = { token: ghToken, fetchedAt: Date.now() };
+    return ghToken;
+  }
+
+  return null;
+}
+
+// Appelé par github.js quand l'API GitHub retourne 401 → invalide le cache
+// pour forcer un nouveau spawn `gh auth token` (l'utilisateur a peut-être
+// rafraîchi entre temps avec `gh auth refresh`).
+export function invalidateGitHubToken() {
+  ghTokenCache = { token: null, fetchedAt: 0 };
 }
 
 /**
