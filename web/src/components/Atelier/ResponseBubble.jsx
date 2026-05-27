@@ -13,6 +13,7 @@ export default function ResponseBubble({
   assistantText,
   streaming,
   events,
+  restored = false,
 }) {
   const toolCalls = useMemo(() => collectToolCalls(events), [events]);
   const stderr = useMemo(
@@ -56,6 +57,23 @@ export default function ResponseBubble({
           className="a-response__actions"
           style={{ display: "flex", alignItems: "center", gap: "12px" }}
         >
+          {restored && (
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "10px",
+                color: "var(--ink-3)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                padding: "2px 8px",
+                background: "var(--surface-2)",
+                borderRadius: "999px",
+              }}
+              title="Conversation restaurée depuis l'historique local"
+            >
+              📜 archivé
+            </span>
+          )}
           {streaming && (
             <span className="a-streaming">
               <span className="a-streaming__dot" />
@@ -79,7 +97,7 @@ export default function ResponseBubble({
 
       <div className="a-response__body">
         <div className="a-response__userprompt">
-          <div className="a-response__userlbl">tu</div>
+          <div className="a-response__userlbl">Léo</div>
           <p>{prompt || "(prompt vide)"}</p>
         </div>
 
@@ -87,13 +105,20 @@ export default function ResponseBubble({
           className="a-response__userprompt a-response__ai"
           style={{ borderLeftColor: "var(--lx-yellow)" }}
         >
-          <div className="a-response__userlbl a-response__userlbl--ai">claude</div>
+          <div className="a-response__userlbl a-response__userlbl--ai">Claude</div>
           <div className="a-md" style={{ marginTop: "8px" }}>
             {assistantText ? renderMarkdown(assistantText) : null}
             {streaming && <span className="a-caret" />}
-            {!streaming && !assistantText && (
+            {!streaming && !assistantText && !restored && (
               <p style={{ color: "var(--ink-3)", fontSize: "13px" }}>
                 Pas encore de réponse. Lance le run.
+              </p>
+            )}
+            {!streaming && !assistantText && restored && (
+              <p style={{ color: "var(--ink-3)", fontSize: "13px", fontStyle: "italic" }}>
+                Réponse non conservée — cette entrée a été créée avant que la
+                persistance soit activée (v0.4.3). Relance le skill pour avoir
+                une nouvelle réponse.
               </p>
             )}
           </div>

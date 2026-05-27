@@ -31,6 +31,13 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const [suggestion, setSuggestion] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const abortRef = useRef(null);
+  // Accumulateur d'events synchrone (state setEvents est async, pas lisible
+  // immédiatement après le push). Utilisé pour calculer assistantText final
+  // au moment du save dans l'historique.
+  const eventsAccumRef = useRef([]);
+  // Marque qu'on affiche une entrée restaurée depuis l'historique (mode
+  // lecture seule, pas de tools/stderr à montrer puisque non sauvegardés).
+  const [restoredFromHistory, setRestoredFromHistory] = useState(false);
 
   // Charge la liste des skills depuis le bridge
   useEffect(() => {
@@ -113,6 +120,8 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     if (running) return;
     setError("");
     setEvents([]);
+    setRestoredFromHistory(false);
+    eventsAccumRef.current = [];
     setRunning(true);
 
     const controller = new AbortController();
@@ -134,7 +143,9 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
           if (eventName === "end" || eventName === "error") {
             receivedFinal = true;
           }
-          setEvents((prev) => [...prev, { eventName, data }]);
+          const ev = { eventName, data };
+          eventsAccumRef.current.push(ev);
+          setEvents((prev) => [...prev, ev]);
         },
         controller.signal,
       );
@@ -145,6 +156,16 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         );
       }
 
+      // Sauve l'entrée + la réponse Claude pour pouvoir restaurer la
+      // conversation au clic dans l'historique. On capture le texte assemblé
+      // depuis les events à ce moment précis (pas via la ref state).
+      const finalAssistantText = collectAssistantText(
+        // events state n'est pas encore à jour ici (setter async) — on
+        // reconstruit depuis le tableau accumulé localement via le callback.
+        // Workaround : on utilise une closure mutable.
+        eventsAccumRef.current,
+      );
+
       const entry = {
         startedAt: Date.now(),
         skill: skillToUse,
@@ -153,6 +174,7 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         tag: TAG_FOR_SKILL[skillToUse] || "doc",
         fav: false,
         client: "—",
+        assistantText: finalAssistantText,
       };
       const updated = HistStore.add(entry);
       setHistoryEntries(updated);
@@ -171,7 +193,38 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     setActiveHistId(entry.id);
     setSelectedSkill(entry.skill || "");
     setPrompt(entry.prompt || "");
+    setError("");
+
+    // Restaure la conversation si la réponse a été sauvegardée. On
+    // synthétise un event "assistant" qui réincarne le texte final → la
+    // ResponseBubble s'affiche comme à la fin du run d'origine.
+    if (entry.assistantText) {
+      setEvents([
+        {
+          eventName: "assistant",
+          data: {
+            message: {
+              content: [{ type: "text", text: entry.assistantText }],
+            },
+          },
+        },
+      ]);
+      setRestoredFromHistory(true);
+    } else {
+      setEvents([]);
+      setRestoredFromHistory(false);
+    }
+  };
+
+  // "Nouveau" : reset complet pour repartir d'une page blanche.
+  const handleNew = () => {
+    setActiveHistId(null);
+    setSelectedSkill("");
+    setPrompt("");
     setEvents([]);
+    setError("");
+    setRestoredFromHistory(false);
+    setSuggestion(null);
   };
 
   const handleKeyDown = (e) => {
@@ -241,14 +294,24 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Tape ta question librement — claude choisira le skill pertinent (mail client, problème S300X, demande de CR, etc.)"
+            placeholder="Tape ta question librement — Claude choisira le skill pertinent (mail client, problème S300X, demande de CR, etc.)"
             disabled={running}
             spellCheck="false"
             rows={4}
           />
           <div className="a-composer__foot">
-            <div className="a-composer__hints">
-              <kbd>Ctrl</kbd> + <kbd>↵</kbd> pour lancer
+            <div className="a-composer__hints" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span><kbd>Ctrl</kbd> + <kbd>↵</kbd> pour lancer</span>
+              {(prompt || events.length > 0) && !running && (
+                <button
+                  type="button"
+                  onClick={handleNew}
+                  className="a-chip"
+                  title="Vider le composer et la conversation"
+                >
+                  + Nouveau
+                </button>
+              )}
             </div>
             {running ? (
               <button
@@ -361,6 +424,7 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             assistantText={assistantText}
             streaming={running}
             events={events}
+            restored={restoredFromHistory}
           />
         )}
       </section>
