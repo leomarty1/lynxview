@@ -22,8 +22,12 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const [skills, setSkills] = useState([]);
   const [selectedSkill, setSelectedSkill] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [events, setEvents] = useState([]);
-  const [running, setRunning] = useState(false);
+  // messages : fil de bulles de conversation. Chaque entrée :
+  //   { id, sessionId, prompt, skill, events[], streaming, restored }
+  // Nouveaux runs prepend → la bulle récente apparaît juste sous le composer,
+  // les anciens descendent dans le fil. Pas de scroll auto (le user lit
+  // naturellement le haut, qui est le plus récent).
+  const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
   const [historyEntries, setHistoryEntries] = useState(() => HistStore.list());
   const [activeHistId, setActiveHistId] = useState(null);
@@ -31,17 +35,15 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const [suggestion, setSuggestion] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const abortRef = useRef(null);
-  // Accumulateur d'events synchrone (state setEvents est async, pas lisible
-  // immédiatement après le push). Utilisé pour calculer assistantText final
-  // au moment du save dans l'historique.
-  const eventsAccumRef = useRef([]);
-  // Marque qu'on affiche une entrée restaurée depuis l'historique (mode
-  // lecture seule, pas de tools/stderr à montrer puisque non sauvegardés).
-  const [restoredFromHistory, setRestoredFromHistory] = useState(false);
-  // Refs pour l'auto-scroll : on suit le bas de la conversation pendant le
-  // streaming, mais sans déranger Léo s'il a scrollé pour relire.
+  // Map id → events accumulés synchrone (state messages est async, pas
+  // lisible immédiatement après un setMessages dans le callback SSE).
+  // Utilisé pour calculer assistantText final au save dans l'historique.
+  const msgEventsAccumRef = useRef(new Map());
+  // Ref pour scroller en haut au démarrage d'un nouveau run (voir le nouveau
+  // message qui apparaît juste sous le composer).
   const mainColRef = useRef(null);
-  const msgsEndRef = useRef(null);
+
+  const running = messages.some((m) => m.streaming);
 
   // Charge la liste des skills depuis le bridge
   useEffect(() => {
@@ -77,24 +79,15 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     return () => clearTimeout(id);
   }, [prompt, selectedSkill, skills]);
 
-  // Texte assistant assemblé depuis les events SSE
-  const assistantText = useMemo(() => collectAssistantText(events), [events]);
-  const phase = running ? "streaming" : events.length === 0 ? "idle" : "result";
+  const phase = messages.length === 0 ? "idle" : "result";
 
-  // Auto-scroll smart : suit le bas tant que Léo est dans les 120 derniers px.
-  // S'il a scrollé vers le haut pour relire, on respecte sa position. Au clic
-  // sur une entrée historique (restored), on force un scroll initial pour
-  // voir la conversation entière en bas.
+  // Au démarrage d'un nouveau run, scroll en haut de la zone main pour voir
+  // le nouveau message apparaître juste sous le composer.
   useEffect(() => {
-    const container = mainColRef.current;
-    if (!container) return;
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const userNearBottom = distanceFromBottom < 120;
-    if (userNearBottom || restoredFromHistory) {
-      msgsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (running) {
+      mainColRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     }
-  }, [assistantText, events.length, restoredFromHistory, error]);
+  }, [messages.length, running]);
 
   const filteredHistory = useMemo(() => {
     if (histFilter === "archive") {
@@ -134,14 +127,19 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     }
   };
 
-  // Lancer un run
+  // Génère un sessionId court (S-XXXXXX-XXXX) pour identifier visuellement
+  // chaque run dans le fil.
+  const makeSessionId = () =>
+    "S-" +
+    Math.random().toString(36).slice(2, 8).toUpperCase() +
+    "-" +
+    Date.now().toString(36).slice(-4);
+
+  // Lancer un run — prepend un nouveau message dans le fil, le streame via
+  // SSE, le marque terminé à la fin et l'ajoute à l'historique.
   const launch = useCallback(async () => {
     if (running) return;
     setError("");
-    setEvents([]);
-    setRestoredFromHistory(false);
-    eventsAccumRef.current = [];
-    setRunning(true);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -149,8 +147,23 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     const skillToUse = selectedSkill || suggestion?.name || "";
     const body = skillToUse ? { skill: skillToUse, args: prompt } : { prompt };
 
-    // Si le stream se termine sans event end/error, c'est un disconnect réseau
-    // → réponse tronquée, on l'indique à Léo.
+    // Snapshot du prompt courant — Léo peut le modifier pendant le streaming
+    // sans qu'on perde le prompt original du run.
+    const promptSnapshot = prompt;
+    const msgId = "msg-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+
+    const newMsg = {
+      id: msgId,
+      sessionId: makeSessionId(),
+      prompt: promptSnapshot,
+      skill: skillToUse,
+      events: [],
+      streaming: true,
+      restored: false,
+    };
+    setMessages((prev) => [newMsg, ...prev]);
+    msgEventsAccumRef.current.set(msgId, []);
+
     let receivedFinal = false;
 
     try {
@@ -163,8 +176,13 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             receivedFinal = true;
           }
           const ev = { eventName, data };
-          eventsAccumRef.current.push(ev);
-          setEvents((prev) => [...prev, ev]);
+          const accum = msgEventsAccumRef.current.get(msgId);
+          if (accum) accum.push(ev);
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msgId ? { ...m, events: [...m.events, ev] } : m,
+            ),
+          );
         },
         controller.signal,
       );
@@ -175,21 +193,14 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         );
       }
 
-      // Sauve l'entrée + la réponse Claude pour pouvoir restaurer la
-      // conversation au clic dans l'historique. On capture le texte assemblé
-      // depuis les events à ce moment précis (pas via la ref state).
-      const finalAssistantText = collectAssistantText(
-        // events state n'est pas encore à jour ici (setter async) — on
-        // reconstruit depuis le tableau accumulé localement via le callback.
-        // Workaround : on utilise une closure mutable.
-        eventsAccumRef.current,
-      );
+      const finalEvents = msgEventsAccumRef.current.get(msgId) || [];
+      const finalAssistantText = collectAssistantText(finalEvents);
 
       const entry = {
         startedAt: Date.now(),
         skill: skillToUse,
-        prompt,
-        title: prompt.split("\n")[0].slice(0, 80) || "(sans titre)",
+        prompt: promptSnapshot,
+        title: promptSnapshot.split("\n")[0].slice(0, 80) || "(sans titre)",
         tag: TAG_FOR_SKILL[skillToUse] || "doc",
         fav: false,
         client: "—",
@@ -201,37 +212,61 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     } catch (err) {
       if (err.name !== "AbortError") setError(err.message);
     } finally {
-      setRunning(false);
+      // Marque la bulle comme terminée
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, streaming: false } : m)),
+      );
+      msgEventsAccumRef.current.delete(msgId);
       abortRef.current = null;
     }
   }, [baseUrl, token, selectedSkill, prompt, running, suggestion]);
 
   const stop = () => abortRef.current?.abort();
 
+  // Clic sur une entrée historique : replace le fil par la conversation
+  // restaurée. Au lieu de continuer le fil courant, on revient sur ce run-là
+  // (plus simple à comprendre que d'avoir des restored mixés avec des runs
+  // live).
   const handleHistClick = (entry) => {
     setActiveHistId(entry.id);
     setSelectedSkill(entry.skill || "");
     setPrompt(entry.prompt || "");
     setError("");
 
-    // Restaure la conversation si la réponse a été sauvegardée. On
-    // synthétise un event "assistant" qui réincarne le texte final → la
-    // ResponseBubble s'affiche comme à la fin du run d'origine.
     if (entry.assistantText) {
-      setEvents([
+      setMessages([
         {
-          eventName: "assistant",
-          data: {
-            message: {
-              content: [{ type: "text", text: entry.assistantText }],
+          id: "restored-" + entry.id,
+          sessionId: makeSessionId(),
+          prompt: entry.prompt || "",
+          skill: entry.skill || "",
+          events: [
+            {
+              eventName: "assistant",
+              data: {
+                message: {
+                  content: [{ type: "text", text: entry.assistantText }],
+                },
+              },
             },
-          },
+          ],
+          streaming: false,
+          restored: true,
         },
       ]);
-      setRestoredFromHistory(true);
     } else {
-      setEvents([]);
-      setRestoredFromHistory(false);
+      // Entrée pré-v0.4.3 sans réponse sauvegardée → bulle placeholder
+      setMessages([
+        {
+          id: "restored-" + entry.id,
+          sessionId: makeSessionId(),
+          prompt: entry.prompt || "",
+          skill: entry.skill || "",
+          events: [],
+          streaming: false,
+          restored: true,
+        },
+      ]);
     }
   };
 
@@ -240,9 +275,8 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     setActiveHistId(null);
     setSelectedSkill("");
     setPrompt("");
-    setEvents([]);
+    setMessages([]);
     setError("");
-    setRestoredFromHistory(false);
     setSuggestion(null);
   };
 
@@ -252,15 +286,6 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       launch();
     }
   };
-
-  const sessionId = useMemo(
-    () =>
-      "S-" +
-      Math.random().toString(36).slice(2, 8).toUpperCase() +
-      "-" +
-      Date.now().toString(36).slice(-4),
-    [],
-  );
 
   return (
     <div className="a-assistant">
@@ -328,7 +353,7 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
               <span>
                 <kbd>Ctrl</kbd> + <kbd>↵</kbd> pour lancer
               </span>
-              {(prompt || events.length > 0) && !running && (
+              {(prompt || messages.length > 0) && !running && (
                 <button
                   type="button"
                   onClick={handleNew}
@@ -405,8 +430,8 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
           </div>
         )}
 
-        {/* Bannière d'erreur compacte au-dessus de la bulle (cas SSE
-            disconnect quand on a déjà du texte affiché). */}
+        {/* Bannière d'erreur compacte (cas SSE disconnect ou erreur de fetch
+            quand on a déjà au moins une bulle affichée). */}
         {phase !== "idle" && error && (
           <div
             role="alert"
@@ -441,20 +466,21 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
           </div>
         )}
 
-        {phase !== "idle" && (
+        {/* Fil de bulles : la plus récente est en haut (index 0), les anciennes
+            descendent. Chaque message a son propre sessionId visible dans son
+            header pour distinguer les runs successifs. */}
+        {messages.map((msg) => (
           <ResponseBubble
-            sessionId={sessionId}
-            skill={selectedSkill || suggestion?.name}
-            prompt={prompt}
-            assistantText={assistantText}
-            streaming={running}
-            events={events}
-            restored={restoredFromHistory}
+            key={msg.id}
+            sessionId={msg.sessionId}
+            skill={msg.skill}
+            prompt={msg.prompt}
+            assistantText={collectAssistantText(msg.events)}
+            streaming={msg.streaming}
+            events={msg.events}
+            restored={msg.restored}
           />
-        )}
-
-        {/* Sentinel pour scrollIntoView auto. */}
-        <div ref={msgsEndRef} />
+        ))}
       </section>
 
       {/* ===== Contexte (droite) ===== */}
