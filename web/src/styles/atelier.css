@@ -442,3 +442,34 @@ body {
 .a-kb__meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
 .a-search { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 9px 18px; font-family: inherit; font-size: 13px; color: var(--ink); width: 360px; outline: none; }
 .a-search:focus { border-color: var(--lx-yellow); }
+
+/* ===== Responsive — écran étroit (< 1400 px) ===== */
+/* Sidebar passe en mode icônes uniquement (56 px), colonnes Assistant
+   rétrécies, KB en une colonne. Le but : permettre à Léo de travailler
+   à côté d'Outlook/HubSpot sans que la colonne main soit étranglée. */
+@media (max-width: 1400px) {
+  .a-side { width: 56px; padding: 18px 8px; }
+  .a-brand { justify-content: center; padding: 4px 0 16px; margin-bottom: 14px; }
+  .a-brand__txt { display: none; }
+  .a-nav__item { justify-content: center; padding: 10px 0; gap: 0; }
+  .a-nav__label, .a-nav__hint { display: none; }
+  .a-bridge { justify-content: center; padding: 8px 0; }
+  .a-bridge__lbl, .a-bridge__sub { display: none; }
+  .a-user { justify-content: center; }
+  .a-user > div:last-child { display: none; }
+  .a-darktog { align-self: center; }
+  .a-side__foot .a-chip { display: none; }
+
+  .a-assistant { grid-template-columns: 260px 1fr 240px; }
+  .a-kb__list { grid-template-columns: 1fr; }
+}
+
+/* ===== Très étroit (< 1100 px) ===== */
+/* Historique et contexte masqués, focus sur la colonne main. */
+@media (max-width: 1100px) {
+  .a-assistant { grid-template-columns: 1fr; }
+  .a-col--hist, .a-col--ctx { display: none; }
+  .a-tickets { grid-template-columns: 1fr; }
+  .a-board { grid-template-columns: 1fr; }
+  .a-kb { grid-template-columns: 1fr; }
+}

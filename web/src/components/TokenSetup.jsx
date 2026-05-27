@@ -1,7 +1,10 @@
-// TokenSetup.jsx — connexion one-click au bridge local. Restylé v0.4
+// TokenSetup.jsx — connexion auto au bridge local. Restylé v0.4
 // en classes Atelier (a-btn / a-search) pour cohérence avec le shell.
+//
+// v0.4.1 : auto-connect au mount via /auth/local. L'écran TokenSetup ne
+// s'affiche réellement que si le bridge est offline ou refuse CORS.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchLocalToken, pingStatus } from "../lib/api.js";
 
 export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
@@ -11,12 +14,21 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [url, setUrl] = useState(baseUrl);
   const [manualToken, setManualToken] = useState("");
+  const autoTried = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     pingStatus(baseUrl)
       .then(() => {
-        if (!cancelled) setBridgeReachable(true);
+        if (cancelled) return;
+        setBridgeReachable(true);
+        // Auto-connect : si le bridge répond ET qu'on n'a pas déjà essayé,
+        // on tente /auth/local immédiatement. En cas de succès, l'utilisateur
+        // ne voit même pas cet écran.
+        if (!autoTried.current) {
+          autoTried.current = true;
+          handleConnect({ silent: true });
+        }
       })
       .catch(() => {
         if (!cancelled) setBridgeReachable(false);
@@ -24,9 +36,10 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl]);
 
-  async function handleConnect() {
+  async function handleConnect({ silent = false } = {}) {
     setConnecting(true);
     setError("");
     try {
@@ -34,6 +47,12 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
       onBaseUrlSet(baseUrl);
       onTokenSet(token);
     } catch (err) {
+      if (silent) {
+        // Auto-connect échoué : on garde l'UI sereine, pas de message rouge
+        // surprise. L'utilisateur peut cliquer manuellement pour voir le détail.
+        setConnecting(false);
+        return;
+      }
       if (err.message === "origin_not_allowed") {
         setError("Le bridge refuse cette origine. Mode manuel ci-dessous.");
       } else if (err.message.startsWith("auth_local_failed")) {
@@ -245,7 +264,7 @@ export default function TokenSetup({ baseUrl, onTokenSet, onBaseUrlSet }) {
 
             <button
               type="button"
-              onClick={handleConnect}
+              onClick={() => handleConnect()}
               disabled={connecting}
               className="a-btn a-btn--primary"
               style={{ width: "100%", justifyContent: "center", padding: "12px 24px" }}
