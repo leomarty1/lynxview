@@ -64,20 +64,37 @@ console.log(
  * Spawn une instance Claude Code headless qui streame du stream-json (JSONL).
  *
  * @param {object} opts
- * @param {string} opts.prompt   - Le prompt complet (peut commencer par /skill).
- * @param {string} [opts.cwd]    - Working directory (par défaut : plugin path).
+ * @param {string} opts.prompt    - Le prompt complet (peut commencer par /skill).
+ * @param {string} [opts.cwd]     - Working directory (par défaut : plugin path).
+ * @param {string} [opts.resumeSessionId] - Si fourni, reprend la session
+ *   Claude correspondante (claude --resume <id>) → le nouveau prompt est un
+ *   follow-up dans la même conversation (contexte préservé).
  * @param {(event: object) => void} opts.onEvent - Appelé pour chaque event JSON.
+ *   Reçoit aussi un event synthétique {type: "session", sessionId} dès que
+ *   l'ID est connu (premier system/init), pour que l'UI puisse le stocker
+ *   et le réutiliser pour --resume.
  * @param {(code: number) => void} opts.onClose - Appelé quand le process termine.
  * @param {(err: Error) => void}   opts.onError - Appelé en cas d'erreur de spawn.
  * @returns {import('node:child_process').ChildProcess}
  */
-export function spawnClaude({ prompt, cwd, onEvent, onClose, onError }) {
+export function spawnClaude({
+  prompt,
+  cwd,
+  resumeSessionId,
+  onEvent,
+  onClose,
+  onError,
+}) {
   const args = [
     "--print",
     "--output-format",
     "stream-json",
     "--verbose",
   ];
+
+  if (resumeSessionId) {
+    args.push("--resume", resumeSessionId);
+  }
 
   // Ajoute les dossiers autorisés à la whitelist Claude (KB Lynxter,
   // historique des solutions, etc. — tout ce qui est hors du cwd plugin).
@@ -106,6 +123,7 @@ export function spawnClaude({ prompt, cwd, onEvent, onClose, onError }) {
   proc.stdin.end();
 
   let stdoutBuf = "";
+  let capturedSessionId = null;
   proc.stdout.on("data", (chunk) => {
     stdoutBuf += chunk.toString("utf8");
     let nl;
@@ -115,6 +133,13 @@ export function spawnClaude({ prompt, cwd, onEvent, onClose, onError }) {
       if (!line) continue;
       try {
         const event = JSON.parse(line);
+        // Capture le session_id Claude dès qu'on le voit (présent dès le
+        // premier event system/init). Émet un event synthétique "session"
+        // que l'UI peut stocker pour les follow-ups via --resume.
+        if (!capturedSessionId && event.session_id) {
+          capturedSessionId = event.session_id;
+          onEvent({ type: "session", sessionId: capturedSessionId });
+        }
         onEvent(event);
       } catch {
         onEvent({ type: "raw", line });

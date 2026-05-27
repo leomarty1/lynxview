@@ -95,7 +95,8 @@ export async function openKnowledgeFile(baseUrl, token, id) {
  *
  * @param {string} baseUrl
  * @param {string} token
- * @param {object} body { prompt?, skill?, args? }
+ * @param {object} body { prompt?, skill?, args?, resumeSessionId? }
+ *   resumeSessionId : si fourni, reprend la session Claude (--resume).
  * @param {(eventName: string, data: object) => void} onEvent
  * @param {AbortSignal} [signal]
  * @returns {Promise<void>} résolu quand l'event "end" est reçu (ou abort).

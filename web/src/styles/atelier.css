@@ -211,9 +211,15 @@ body {
 .a-tag--dev { background: rgba(64, 62, 61, 0.14); color: var(--ink); }
 
 /* ----- composer / main column ----- */
-/* Composer en haut, conversation au-dessous. Le scroll vit dans .a-col--main
-   directement : on suit naturellement le texte qui s'écrit vers le bas. */
-.a-col--main { padding: 22px 26px; gap: 18px; overflow-y: auto; }
+/* Pattern chat chronologique : zone messages scrollable en haut (vieux haut,
+   récent bas), composer fixé en bas. Le min-height: 0 sur .a-msgs est crucial
+   dans flex column pour autoriser le overflow-y: auto à fonctionner. */
+.a-col--main { padding: 22px 26px; gap: 14px; overflow: hidden; }
+.a-msgs {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding-right: 4px;
+}
 .a-composer { flex-shrink: 0; }
 
 .a-composer {

@@ -158,9 +158,11 @@ export function createApp() {
     res.json(s);
   });
 
-  // /run — POST { prompt | skill+args } → SSE stream.
+  // /run — POST { prompt | skill+args, [resumeSessionId] } → SSE stream.
+  // resumeSessionId : si fourni, le bridge passe --resume <id> à Claude
+  // pour reprendre la session existante (follow-up dans la même conv).
   app.post("/run", (req, res) => {
-    const { prompt, skill, args } = req.body || {};
+    const { prompt, skill, args, resumeSessionId } = req.body || {};
     if (!prompt && !skill) {
       return res.status(400).json({ error: "prompt_or_skill_required" });
     }
@@ -224,6 +226,7 @@ export function createApp() {
 
     const proc = spawnClaude({
       prompt: fullPrompt,
+      resumeSessionId: resumeSessionId || undefined,
       onEvent: (event) => {
         if (finalized) return;
         writeEvent(event.type || "message", event);

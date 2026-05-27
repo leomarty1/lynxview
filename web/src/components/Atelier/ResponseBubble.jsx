@@ -1,6 +1,6 @@
-// ResponseBubble.jsx — bulle de conversation (prompt user + réponse assistant
-// streaming + tool calls collapsibles + stderr collapsible).
-// Le bouton "Copier" apparaît une fois le streaming terminé.
+// ResponseBubble.jsx — bulle de conversation : prompt user (repliable) +
+// réponse Claude streaming + tool calls + stderr collapsibles +
+// barre d'actions sous le texte assistant (Copier / Régénérer / Éditer).
 
 import { useMemo, useState } from "react";
 import { renderMarkdown } from "../../lib/markdown.js";
@@ -14,6 +14,11 @@ export default function ResponseBubble({
   streaming,
   events,
   restored = false,
+  promptFolded = false,
+  isResumed = false,
+  onRegenerate,
+  onEditPrompt,
+  onToggleFoldPrompt,
 }) {
   const toolCalls = useMemo(() => collectToolCalls(events), [events]);
   const stderr = useMemo(
@@ -37,6 +42,17 @@ export default function ResponseBubble({
     }
   };
 
+  // Seuil au-delà duquel on propose de replier le prompt (long mail client).
+  const LONG_PROMPT_THRESHOLD = 280;
+  const isLongPrompt = (prompt || "").length > LONG_PROMPT_THRESHOLD;
+  const promptToShow = promptFolded
+    ? (prompt || "").slice(0, LONG_PROMPT_THRESHOLD) + "…"
+    : prompt || "(prompt vide)";
+
+  // Les actions ne s'affichent que quand le streaming est terminé et qu'on
+  // a une réponse à manipuler.
+  const showActions = !streaming && assistantText;
+
   return (
     <div className="a-response">
       <header className="a-response__head">
@@ -55,8 +71,25 @@ export default function ResponseBubble({
         </div>
         <div
           className="a-response__actions"
-          style={{ display: "flex", alignItems: "center", gap: "12px" }}
+          style={{ display: "flex", alignItems: "center", gap: "8px" }}
         >
+          {isResumed && (
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "10px",
+                color: "var(--ink-3)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                padding: "2px 8px",
+                background: "var(--surface-2)",
+                borderRadius: "999px",
+              }}
+              title="Ce message est un follow-up qui a le contexte des messages précédents (Claude --resume)"
+            >
+              🔗 suite
+            </span>
+          )}
           {restored && (
             <span
               style={{
@@ -80,27 +113,38 @@ export default function ResponseBubble({
               streaming
             </span>
           )}
-          {!streaming && assistantText && (
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="a-btn"
-              style={{ padding: "6px 12px", fontSize: "12px" }}
-              aria-label="Copier la réponse"
-              title="Copier la réponse dans le presse-papier"
-            >
-              {copied ? "✓ Copié" : "📋 Copier"}
-            </button>
-          )}
         </div>
       </header>
 
       <div className="a-response__body">
+        {/* Bulle utilisateur — repliable si long */}
         <div className="a-response__userprompt">
-          <div className="a-response__userlbl">Léo</div>
-          <p>{prompt || "(prompt vide)"}</p>
+          <div
+            className="a-response__userlbl"
+            style={{ display: "flex", alignItems: "center", gap: 8 }}
+          >
+            <span>Léo</span>
+            {isLongPrompt && onToggleFoldPrompt && (
+              <button
+                type="button"
+                onClick={onToggleFoldPrompt}
+                className="a-chip"
+                style={{ padding: "1px 8px", fontSize: 10 }}
+                aria-label={promptFolded ? "Déplier le prompt" : "Replier le prompt"}
+                title={
+                  promptFolded
+                    ? "Afficher le prompt complet"
+                    : "Cacher le prompt long"
+                }
+              >
+                {promptFolded ? "▸ déplier" : "▾ replier"}
+              </button>
+            )}
+          </div>
+          <p style={{ whiteSpace: "pre-wrap" }}>{promptToShow}</p>
         </div>
 
+        {/* Bulle Claude */}
         <div
           className="a-response__userprompt a-response__ai"
           style={{ borderLeftColor: "var(--lx-yellow)" }}
@@ -116,14 +160,62 @@ export default function ResponseBubble({
             )}
             {!streaming && !assistantText && restored && (
               <p style={{ color: "var(--ink-3)", fontSize: "13px", fontStyle: "italic" }}>
-                Réponse non conservée — cette entrée a été créée avant que la
-                persistance soit activée (v0.4.3). Relance le skill pour avoir
-                une nouvelle réponse.
+                Réponse non conservée — cette entrée a été créée avant la
+                persistance (v0.4.3). Relance le skill pour une nouvelle
+                réponse.
               </p>
             )}
           </div>
+
+          {/* Barre d'actions sous la réponse Claude — apparaît une fois le
+              streaming terminé. Visuellement attaché à la bulle assistant
+              pour qu'il n'y ait aucune ambiguïté sur quoi est copié/régénéré. */}
+          {showActions && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTop: "1px dashed var(--line)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="a-chip"
+                aria-label="Copier la réponse"
+                title="Copier la réponse Claude dans le presse-papier"
+              >
+                {copied ? "✓ Copié" : "📋 Copier"}
+              </button>
+              {onRegenerate && (
+                <button
+                  type="button"
+                  onClick={onRegenerate}
+                  className="a-chip"
+                  aria-label="Régénérer la réponse"
+                  title="Relancer le même prompt pour une autre réponse"
+                >
+                  🔄 Régénérer
+                </button>
+              )}
+              {onEditPrompt && (
+                <button
+                  type="button"
+                  onClick={onEditPrompt}
+                  className="a-chip"
+                  aria-label="Éditer mon prompt"
+                  title="Récupérer le prompt dans le composer pour le modifier et relancer"
+                >
+                  ✏️ Éditer
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Tool calls collapsibles */}
         {toolCalls.length > 0 && (
           <details
             style={{
