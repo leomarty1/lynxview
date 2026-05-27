@@ -43,7 +43,9 @@ export async function parseSseStream(body, onEvent, signal) {
   }
 }
 
-function parseBlock(block) {
+// Exporté pour les tests unitaires (edge cases CRLF, JSON invalide, multi-line data).
+// L'API publique reste parseSseStream.
+export function parseBlock(block) {
   let eventName = "message";
   const dataLines = [];
   for (const rawLine of block.split("\n")) {
