@@ -39,6 +39,17 @@ const DEFAULT_PLUGIN_PATH = path.join(
   "lynxter-support-cc",
 );
 
+// Dossiers que claude --print doit pouvoir lire EN PLUS de son cwd
+// (qui est config.pluginPath). Sans ça, les skills (diagnostic, support,
+// learn…) qui consultent la KB Lynxter ou l'historique des solutions se
+// font refuser l'accès aux fichiers et retournent "KB non accessible".
+//
+// Override via LYNXVIEW_CLAUDE_ALLOWED_DIRS (séparé par ; sous Windows).
+const DOCUMENTS_CLAUDE = path.join(os.homedir(), "Documents", "Claude");
+const DEFAULT_ALLOWED_DIRS = [
+  DOCUMENTS_CLAUDE, // couvre Connaissance/, lynxter-support-cc/, etc.
+];
+
 export const config = {
   host: "127.0.0.1",
   port: Number(process.env.LYNXTER_BRIDGE_PORT || 5174),
@@ -50,6 +61,10 @@ export const config = {
     process.env.LYNXTER_PLUGIN_PATH || DEFAULT_PLUGIN_PATH,
     "skills",
   ),
+  claudeAllowedDirs: (process.env.LYNXVIEW_CLAUDE_ALLOWED_DIRS
+    ? process.env.LYNXVIEW_CLAUDE_ALLOWED_DIRS.split(path.delimiter)
+    : DEFAULT_ALLOWED_DIRS
+  ).filter((d) => d && fs.existsSync(d)),
   allowedOrigins: [
     "http://localhost:5173",
     "http://localhost:4173",
@@ -79,4 +94,5 @@ export function logStartup() {
   console.log(`  skillsPath:  ${config.skillsPath}`);
   console.log(`  tokenFile:   ${config.tokenFile}`);
   console.log(`  claudeBin:   ${config.claudeBin}`);
+  console.log(`  allowedDirs: ${config.claudeAllowedDirs.join(", ") || "(none)"}`);
 }

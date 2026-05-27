@@ -79,6 +79,14 @@ export function spawnClaude({ prompt, cwd, onEvent, onClose, onError }) {
     "--verbose",
   ];
 
+  // Ajoute les dossiers autorisés à la whitelist Claude (KB Lynxter,
+  // historique des solutions, etc. — tout ce qui est hors du cwd plugin).
+  // Sans --add-dir, Claude headless refuse Read/Grep en dehors du cwd et
+  // les skills retournent "KB non accessible (permissions)".
+  for (const dir of config.claudeAllowedDirs || []) {
+    args.push("--add-dir", dir);
+  }
+
   const fullArgs = [...RESOLVED.prefixArgs, ...args];
   const proc = spawn(RESOLVED.bin, fullArgs, {
     // Sur Windows, on appelle directement `node cli.js` (pas claude.cmd via
