@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchSkills, runSkill } from "../../lib/api.js";
-import { History as HistStore, Token } from "../../lib/storage.js";
+import { Tickets, Token } from "../../lib/storage.js";
 import { matchSkill } from "../../lib/skillMatch.js";
 import {
   TAG_FOR_SKILL,
@@ -22,22 +22,25 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   const [skills, setSkills] = useState([]);
   const [selectedSkill, setSelectedSkill] = useState("");
   const [prompt, setPrompt] = useState("");
-  // messages : fil de bulles de conversation. Chaque entrée :
-  //   { id, sessionId, prompt, skill, events[], streaming, restored }
-  // Nouveaux runs prepend → la bulle récente apparaît juste sous le composer,
-  // les anciens descendent dans le fil. Pas de scroll auto (le user lit
-  // naturellement le haut, qui est le plus récent).
+  // messages : le fil de la conversation courante (= les messages du ticket
+  // actif). Chaque entrée :
+  //   { id, sessionId, claudeSessionId, prompt, skill, events[], streaming,
+  //     restored, promptFolded, resumedFrom, assistantText (pour msgs sauvés) }
   const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
-  const [historyEntries, setHistoryEntries] = useState(() => HistStore.list());
-  const [activeHistId, setActiveHistId] = useState(null);
+  // tickets : la liste persistée (= contenu de l'historique).
+  const [tickets, setTickets] = useState(() => Tickets.list());
+  // currentTicketId : l'identifiant du ticket actif (= la conversation
+  // affichée dans le fil). null = brouillon non encore sauvegardé (sera
+  // créé au prochain Lancer).
+  const [currentTicketId, setCurrentTicketId] = useState(null);
   const [histFilter, setHistFilter] = useState("all");
   const [suggestion, setSuggestion] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const abortRef = useRef(null);
   // Map id → events accumulés synchrone (state messages est async, pas
   // lisible immédiatement après un setMessages dans le callback SSE).
-  // Utilisé pour calculer assistantText final au save dans l'historique.
+  // Utilisé pour calculer assistantText final au save dans le ticket.
   const msgEventsAccumRef = useRef(new Map());
   // Refs pour l'auto-scroll vers le bas (pattern chat chronologique).
   const msgsRef = useRef(null);
@@ -101,41 +104,53 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     running,
   ]);
 
-  const filteredHistory = useMemo(() => {
+  // Liste filtrée des tickets pour l'historique
+  const filteredTickets = useMemo(() => {
     if (histFilter === "archive") {
-      return historyEntries.filter((h) => h.archived);
+      return tickets.filter((t) => t.archived);
     }
-    const visible = historyEntries.filter((h) => !h.archived);
+    const visible = tickets.filter((t) => !t.archived);
     if (histFilter === "all") return visible;
-    if (histFilter === "fav") return visible.filter((h) => h.fav);
-    return visible.filter((h) => h.tag === histFilter);
-  }, [historyEntries, histFilter]);
+    if (histFilter === "fav") return visible.filter((t) => t.fav);
+    return visible.filter((t) => t.tag === histFilter);
+  }, [tickets, histFilter]);
 
   const archiveCount = useMemo(
-    () => historyEntries.filter((h) => h.archived).length,
-    [historyEntries],
+    () => tickets.filter((t) => t.archived).length,
+    [tickets],
   );
 
-  const grouped = useMemo(() => groupByDate(filteredHistory), [filteredHistory]);
+  // Groupage par date (basé sur updatedAt — un ticket touché aujourd'hui
+  // apparaît dans "Aujourd'hui" même s'il a été créé il y a une semaine)
+  const groupedForHist = useMemo(
+    () =>
+      groupByDate(
+        filteredTickets.map((t) => ({ ...t, startedAt: t.updatedAt })),
+      ),
+    [filteredTickets],
+  );
 
-  // Actions historique
-  const handleArchive = (id, e) => {
+  // Actions sur les tickets (archive / désarchive / supprime)
+  const handleArchive = (ticketId, e) => {
     e.stopPropagation();
-    setHistoryEntries(HistStore.archive(id));
+    setTickets(Tickets.archive(ticketId));
   };
-  const handleUnarchive = (id, e) => {
+  const handleUnarchive = (ticketId, e) => {
     e.stopPropagation();
-    setHistoryEntries(HistStore.unarchive(id));
+    setTickets(Tickets.unarchive(ticketId));
   };
-  const handleDelete = (id, e) => {
+  const handleDelete = (ticketId, e) => {
     e.stopPropagation();
-    if (confirmDelete === id) {
-      setHistoryEntries(HistStore.remove(id));
+    if (confirmDelete === ticketId) {
+      setTickets(Tickets.remove(ticketId));
       setConfirmDelete(null);
-      if (activeHistId === id) setActiveHistId(null);
+      if (currentTicketId === ticketId) {
+        setCurrentTicketId(null);
+        setMessages([]);
+      }
     } else {
-      setConfirmDelete(id);
-      setTimeout(() => setConfirmDelete((c) => (c === id ? null : c)), 3000);
+      setConfirmDelete(ticketId);
+      setTimeout(() => setConfirmDelete((c) => (c === ticketId ? null : c)), 3000);
     }
   };
 
@@ -247,28 +262,39 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         const finalEvents = msgEventsAccumRef.current.get(msgId) || [];
         const finalAssistantText = collectAssistantText(finalEvents);
 
-        const entry = {
-          startedAt: Date.now(),
-          skill: skillToUse,
-          prompt: promptSnapshot,
-          title:
-            promptSnapshot.split("\n")[0].slice(0, 80) || "(sans titre)",
-          tag: TAG_FOR_SKILL[skillToUse] || "doc",
-          fav: false,
-          client: "—",
-          assistantText: finalAssistantText,
-          // Stocke le session Claude pour pouvoir reprendre depuis l'historique
-          claudeSessionId: null, // sera mis à jour ci-dessous via une closure
-        };
-        // Récupère le claudeSessionId capturé dans le state
+        // Récupère le claudeSessionId qui a été capturé dans le state messages
+        let capturedClaudeSession = null;
         setMessages((prev) => {
           const cur = prev.find((m) => m.id === msgId);
-          if (cur?.claudeSessionId) entry.claudeSessionId = cur.claudeSessionId;
+          if (cur?.claudeSessionId) capturedClaudeSession = cur.claudeSessionId;
           return prev;
         });
-        const updated = HistStore.add(entry);
-        setHistoryEntries(updated);
-        setActiveHistId(updated[0].id);
+
+        // Sérialise le message pour le store ticket (pas d'events, juste le
+        // texte final — ça suffit pour réafficher la conversation).
+        const persistedMessage = {
+          id: msgId,
+          sessionId: newMsg.sessionId,
+          claudeSessionId: capturedClaudeSession,
+          prompt: promptSnapshot,
+          skill: skillToUse,
+          assistantText: finalAssistantText,
+          startedAt: Date.now(),
+        };
+
+        // Soit on append au ticket courant, soit on en crée un nouveau.
+        let updatedList;
+        if (currentTicketId) {
+          Tickets.addMessage(currentTicketId, persistedMessage);
+        } else {
+          const ticket = Tickets.create({
+            ...persistedMessage,
+            tag: TAG_FOR_SKILL[skillToUse] || "doc",
+          });
+          setCurrentTicketId(ticket.id);
+        }
+        updatedList = Tickets.list();
+        setTickets(updatedList);
       } catch (err) {
         if (err.name !== "AbortError") setError(err.message);
       } finally {
@@ -279,7 +305,16 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
         abortRef.current = null;
       }
     },
-    [baseUrl, token, selectedSkill, prompt, running, suggestion, messages],
+    [
+      baseUrl,
+      token,
+      selectedSkill,
+      prompt,
+      running,
+      suggestion,
+      messages,
+      currentTicketId,
+    ],
   );
 
   const stop = () => abortRef.current?.abort();
@@ -299,14 +334,14 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     [launch],
   );
 
-  // Éditer mon prompt : remet le prompt dans le composer pour modif,
-  // pré-sélectionne le skill, et supprime la bulle (pour qu'au prochain
-  // Lancer le fork de conversation soit propre).
+  // Éditer mon prompt : remet le prompt dans le composer pour modif. La
+  // bulle existante reste dans le fil — Léo modifie son prompt et relance,
+  // ce qui crée un NOUVEAU message dans le ticket (follow-up via --resume).
+  // S'il veut vraiment supprimer le msg fautif, il supprime le ticket
+  // entier ou crée un nouveau ticket via "+ Nouveau".
   const handleEditPrompt = useCallback((msg) => {
     setPrompt(msg.prompt || "");
     setSelectedSkill(msg.skill || "");
-    setMessages((prev) => prev.filter((m) => m.id !== msg.id));
-    msgEventsAccumRef.current.delete(msg.id);
   }, []);
 
   // Replier/déplier mon prompt original (utile pour les longs mails clients)
@@ -318,31 +353,33 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
     );
   }, []);
 
-  // Clic sur une entrée historique : replace le fil par la conversation
-  // restaurée. Au lieu de continuer le fil courant, on revient sur ce run-là
-  // (plus simple à comprendre que d'avoir des restored mixés avec des runs
-  // live).
-  const handleHistClick = (entry) => {
-    setActiveHistId(entry.id);
-    setSelectedSkill(entry.skill || "");
-    setPrompt(entry.prompt || "");
+  // Clic sur un ticket dans l'historique : charge TOUTE la conversation
+  // (= tous les messages du ticket) dans le fil central. Le composer est
+  // prêt pour des follow-ups (claude --resume via le claudeSessionId du
+  // dernier message). Aucun message restauré n'est marqué "draft" : le
+  // ticket existe déjà en store, les nouveaux runs s'y ajoutent.
+  const handleHistClick = (ticket) => {
+    setCurrentTicketId(ticket.id);
     setError("");
+    // Le composer est vide quand on ouvre un ticket — Léo écrit un follow-up
+    // s'il veut continuer (ou clique sur Éditer/Régénérer d'un msg existant).
+    setPrompt("");
+    setSelectedSkill("");
 
-    // Le claudeSessionId stocké dans l'entry permet à launch() de reprendre
-    // la session Claude réelle pour les follow-ups (--resume).
-    const restoredMsg = {
-      id: "restored-" + entry.id,
-      sessionId: makeSessionId(),
-      claudeSessionId: entry.claudeSessionId || null,
-      prompt: entry.prompt || "",
-      skill: entry.skill || "",
-      events: entry.assistantText
+    // Reconstruit les messages avec un event synthétique pour ReactBubble.
+    const restored = (ticket.messages || []).map((m) => ({
+      id: m.id,
+      sessionId: m.sessionId,
+      claudeSessionId: m.claudeSessionId || null,
+      prompt: m.prompt || "",
+      skill: m.skill || "",
+      events: m.assistantText
         ? [
             {
               eventName: "assistant",
               data: {
                 message: {
-                  content: [{ type: "text", text: entry.assistantText }],
+                  content: [{ type: "text", text: m.assistantText }],
                 },
               },
             },
@@ -352,13 +389,17 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
       restored: true,
       promptFolded: false,
       resumedFrom: null,
-    };
-    setMessages([restoredMsg]);
+      // Conserve l'assistantText déjà rendu pour ResponseBubble
+      assistantText: m.assistantText || "",
+    }));
+    setMessages(restored);
   };
 
-  // "Nouveau" : reset complet pour repartir d'une page blanche.
+  // "+ Nouveau ticket" : clôt la conversation courante (le ticket est déjà
+  // sauvegardé en store au fil de l'eau) et démarre une page blanche.
+  // Le prochain Lancer créera un nouveau ticket.
   const handleNew = () => {
-    setActiveHistId(null);
+    setCurrentTicketId(null);
     setSelectedSkill("");
     setPrompt("");
     setMessages([]);
@@ -376,11 +417,11 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
   return (
     <div className="a-assistant">
       <HistoryPanel
-        filteredHistory={filteredHistory}
-        grouped={grouped}
+        filteredHistory={filteredTickets}
+        grouped={groupedForHist}
         histFilter={histFilter}
         setHistFilter={setHistFilter}
-        activeHistId={activeHistId}
+        activeHistId={currentTicketId}
         archiveCount={archiveCount}
         confirmDelete={confirmDelete}
         onHistClick={handleHistClick}
@@ -517,19 +558,32 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
               {selectedSkill && (
                 <span>
                   skill <span className="a-meta-val">/{selectedSkill}</span>
-                  {messages.some((m) => m.claudeSessionId) && (
-                    <span
-                      style={{
-                        marginLeft: 10,
-                        fontFamily: "'JetBrains Mono', monospace",
-                        fontSize: 10,
-                        color: "var(--ink-3)",
-                      }}
-                      title="Le prochain run reprendra la session Claude en cours (--resume)"
-                    >
-                      🔗 continuera la conv
-                    </span>
-                  )}
+                </span>
+              )}
+              {currentTicketId && messages.some((m) => m.claudeSessionId) && (
+                <span
+                  style={{
+                    marginLeft: 10,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    color: "var(--ink-3)",
+                  }}
+                  title="Le prochain Lancer ajoute un follow-up au ticket courant (Claude --resume garde le contexte)"
+                >
+                  🔗 follow-up dans ce ticket
+                </span>
+              )}
+              {currentTicketId && !messages.some((m) => m.claudeSessionId) && (
+                <span
+                  style={{
+                    marginLeft: 10,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 10,
+                    color: "var(--ink-3)",
+                  }}
+                  title="Ticket ouvert — le prochain Lancer ajoute un message dedans"
+                >
+                  🎫 ticket ouvert
                 </span>
               )}
             </div>
@@ -540,9 +594,9 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              messages.some((m) => m.claudeSessionId)
-                ? "Continue la conversation (le contexte est préservé via Claude --resume)…"
-                : "Tape ta question librement — Claude choisira le skill pertinent (mail client, problème S300X, demande de CR, etc.)"
+              currentTicketId
+                ? "Ajoute un follow-up à ce ticket (contexte préservé)…"
+                : "Décris le problème — Claude choisira le skill pertinent (mail client, panne S300X, demande de CR, etc.). Un nouveau ticket sera créé."
             }
             disabled={running}
             spellCheck="false"
@@ -556,14 +610,15 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
               <span>
                 <kbd>Ctrl</kbd> + <kbd>↵</kbd> pour lancer
               </span>
-              {(prompt || messages.length > 0) && !running && (
+              {(prompt || messages.length > 0 || currentTicketId) && !running && (
                 <button
                   type="button"
                   onClick={handleNew}
                   className="a-chip"
-                  title="Vider le composer et la conversation"
+                  title="Fermer ce ticket et démarrer un nouveau problème"
+                  style={{ fontWeight: 600 }}
                 >
-                  + Nouveau
+                  + Nouveau ticket
                 </button>
               )}
             </div>
@@ -600,6 +655,11 @@ export default function AtelierAssistant({ baseUrl, token, setRoute }) {
           skill={selectedSkill || suggestion?.name}
           setRoute={setRoute}
           setSelectedSkill={setSelectedSkill}
+          currentTicket={
+            currentTicketId
+              ? tickets.find((t) => t.id === currentTicketId)
+              : null
+          }
         />
       </section>
     </div>

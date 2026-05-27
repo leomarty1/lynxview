@@ -1,7 +1,10 @@
 // ContextRail.jsx — colonne droite de l'Assistant.
 //
-// Affiche : "Cette session" (skill courant + statut), sources de la KB
-// activée par le bridge, et suggestions "suite logique" selon le skill.
+// Affiche :
+// 1. "Ticket courant" : titre + nb messages + skill principal du ticket
+//    actif (ou "brouillon" si pas encore créé).
+// 2. "Sources disponibles" : KB Lynxter + safety check auto.
+// 3. "Suite logique" : suggestions selon le skill courant.
 
 import { suiteForSkill } from "../../lib/atelierHelpers.js";
 
@@ -22,28 +25,83 @@ const SKILL_LABEL = {
   hubspot: "HubSpot",
 };
 
-export default function ContextRail({ skill, setRoute, setSelectedSkill }) {
+export default function ContextRail({
+  skill,
+  setRoute,
+  setSelectedSkill,
+  currentTicket = null,
+}) {
   return (
     <div className="a-ctx">
-      <h3 className="a-ctx__title">Cette session</h3>
+      <h3 className="a-ctx__title">Ticket courant</h3>
       <div className="a-ctx__card">
-        <div className="a-ctx__row">
-          <span className="a-ctx__k">Skill</span>
-          <span className="a-ctx__v">
-            {skill ? (
-              <code style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--lx-blue)" }}>
-                /{skill}
-              </code>
-            ) : (
-              <span style={{ color: "var(--ink-3)", fontStyle: "italic" }}>
-                auto-détection
+        {currentTicket ? (
+          <>
+            <div className="a-ctx__row">
+              <span className="a-ctx__k">Titre</span>
+              <span className="a-ctx__v" style={{ fontSize: "12px" }}>
+                {currentTicket.title}
               </span>
+            </div>
+            <div className="a-ctx__row">
+              <span className="a-ctx__k">Messages</span>
+              <span className="a-ctx__v">
+                💬 {currentTicket.messages?.length || 0}
+              </span>
+            </div>
+            {currentTicket.skill && (
+              <div className="a-ctx__row">
+                <span className="a-ctx__k">Skill</span>
+                <span className="a-ctx__v">
+                  <code style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--lx-blue)" }}>
+                    /{currentTicket.skill}
+                  </code>
+                </span>
+              </div>
             )}
-          </span>
-        </div>
-        {skill && SKILL_LABEL[skill] && (
+            {currentTicket.claudeSessionId && (
+              <div className="a-ctx__row">
+                <span className="a-ctx__k">Session</span>
+                <span
+                  className="a-ctx__v"
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--ink-3)",
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                  title="Session Claude active — les follow-ups reprennent ce contexte"
+                >
+                  🔗 active
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="a-ctx__row">
+              <span className="a-ctx__k">Statut</span>
+              <span
+                className="a-ctx__v"
+                style={{ fontStyle: "italic", color: "var(--ink-3)" }}
+              >
+                brouillon
+              </span>
+            </div>
+            <div className="a-ctx__row">
+              <span className="a-ctx__k">Hint</span>
+              <span
+                className="a-ctx__v"
+                style={{ fontSize: "11px", color: "var(--ink-3)" }}
+              >
+                Le ticket sera créé au premier Lancer.
+              </span>
+            </div>
+          </>
+        )}
+
+        {skill && SKILL_LABEL[skill] && !currentTicket && (
           <div className="a-ctx__row">
-            <span className="a-ctx__k">Rôle</span>
+            <span className="a-ctx__k">Skill prévu</span>
             <span className="a-ctx__v" style={{ fontSize: "12px" }}>
               {SKILL_LABEL[skill]}
             </span>
